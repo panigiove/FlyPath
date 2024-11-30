@@ -33,6 +33,10 @@ impl Drone for FlyPath {
             select_biased!{
                 recv(self.controller_recv) -> cmd => {
                     if let Ok(cmd) = cmd {
+                        if let DroneCommand::Crash = cmd{
+                            println!("Drone {} has crashed", self.id);
+                            break;
+                        }
                         self.command_handler(cmd);
                     }
                 },
@@ -49,17 +53,28 @@ impl Drone for FlyPath {
 
 impl FlyPath {
     // TODO: implement handler
-    fn command_handler (&self, cmd: DroneCommand ){
-        
+    fn command_handler (&mut self, cmd: DroneCommand ){
+        match cmd{
+            DroneCommand::AddSender(id, sender) => {self.packet_send.insert(id, sender);},
+            DroneCommand::SetPacketDropRate(dr) => {self.pdr = dr},
+            _ => { },
+        }
+
     }
 
     fn packet_handler (&self, packet:Packet){
 
     }
+
+    pub fn check_conection(&self, id: NodeId) -> bool{
+        self.packet_send.get(&id).is_some()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+    use std::thread;
     use super::*;
     use crossbeam_channel::unbounded;
 
@@ -83,8 +98,20 @@ mod tests {
     }
 
     // #[test]
-    // fn test_() {
-        
-    //     assert_eq!(expected, actual);
+    // fn test_drone_crashed() {
+    //     let (drone, reciver_event, sender_command, sender_packet, reciver_packet) = setup_test_drone(0.0);
+    //     assert!(matches!(sender_command.send(DroneCommand::Crash), Ok(())));
     // }
+    //
+    // #[test]
+    // fn test_add_sender() {
+    //     let (mut drone, reciver_event, sender_command, sender_packet, reciver_packet) = setup_test_drone(0.0);
+    //     let mut drone_pointer = Arc::new(drone);
+    //     let mut pointer_drone_clone = drone_pointer.clone();
+    //     let thred = thread::spawn(move || {pointer_drone_clone.run()});
+    //     let (s,r) = unbounded();
+    //     sender_command.send(DroneCommand::AddSender(3, s)).unwrap();
+    //     assert!(drone_pointer.check_conection(3));
+    // }
+
 }
