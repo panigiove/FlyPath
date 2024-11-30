@@ -1,9 +1,9 @@
 use crossbeam_channel::{select_biased, Receiver, Sender};
 use std::collections::HashMap;
+use wg_2024::controller::{DroneCommand, NodeEvent};
+use wg_2024::drone::{Drone, DroneOptions};
 use wg_2024::network::NodeId;
 use wg_2024::packet::Packet;
-use wg_2024::drone::{Drone, DroneOptions};
-use wg_2024::controller::{DroneCommand, NodeEvent};
 
 #[derive(Debug, Clone)]
 pub struct FlyPath {
@@ -29,8 +29,8 @@ impl Drone for FlyPath {
     }
 
     fn run(&mut self) {
-        loop{
-            select_biased!{
+        loop {
+            select_biased! {
                 recv(self.controller_recv) -> cmd => {
                     if let Ok(cmd) = cmd {
                         if let DroneCommand::Crash = cmd{
@@ -45,47 +45,53 @@ impl Drone for FlyPath {
                         self.packet_handler(packet);
                     }
                 }
-            }        
+            }
         }
     }
 }
 
-
 impl FlyPath {
     // TODO: implement handler
-    fn command_handler (&mut self, cmd: DroneCommand ){
-        match cmd{
-            DroneCommand::AddSender(id, sender) => {self.packet_send.insert(id, sender);},
-            DroneCommand::SetPacketDropRate(dr) => {self.pdr = dr},
-            _ => { },
+    fn command_handler(&mut self, cmd: DroneCommand) {
+        match cmd {
+            DroneCommand::AddSender(id, sender) => {
+                self.packet_send.insert(id, sender);
+            }
+            DroneCommand::SetPacketDropRate(dr) => self.pdr = dr,
+            _ => {}
         }
-
     }
 
-    fn packet_handler (&self, packet:Packet){
+    fn packet_handler(&self, packet: Packet) {}
 
-    }
-
-    pub fn check_conection(&self, id: NodeId) -> bool{
+    pub fn check_conection(&self, id: NodeId) -> bool {
         self.packet_send.get(&id).is_some()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-    use std::thread;
     use super::*;
     use crossbeam_channel::unbounded;
+    use std::sync::Arc;
+    use std::thread;
 
     // virtual connected drone's ID is 2.
-    fn setup_test_drone(pdr:f32) -> (FlyPath, Receiver<NodeEvent>, Sender<DroneCommand>, Sender<Packet>, Receiver<Packet>) {
+    fn setup_test_drone(
+        pdr: f32,
+    ) -> (
+        FlyPath,
+        Receiver<NodeEvent>,
+        Sender<DroneCommand>,
+        Sender<Packet>,
+        Receiver<Packet>,
+    ) {
         let (drone_event_send, test_event_recv) = unbounded();
         let (test_command_send, drone_command_recv) = unbounded();
         let (test_packet_send, drone_packet_recv) = unbounded();
         let (drone_packet_send, test_packet_recv) = unbounded();
 
-        let config: DroneOptions = DroneOptions { 
+        let config: DroneOptions = DroneOptions {
             id: 1,
             controller_recv: drone_command_recv,
             controller_send: drone_event_send,
@@ -94,7 +100,13 @@ mod tests {
             pdr,
         };
 
-        (FlyPath::new(config), test_event_recv, test_command_send, test_packet_send, test_packet_recv)
+        (
+            FlyPath::new(config),
+            test_event_recv,
+            test_command_send,
+            test_packet_send,
+            test_packet_recv,
+        )
     }
 
     // #[test]
@@ -113,5 +125,4 @@ mod tests {
     //     sender_command.send(DroneCommand::AddSender(3, s)).unwrap();
     //     assert!(drone_pointer.check_conection(3));
     // }
-
 }
