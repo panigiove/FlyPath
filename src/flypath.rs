@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use wg_2024::controller::{DroneCommand, NodeEvent};
 use wg_2024::drone::{Drone, DroneOptions};
 use wg_2024::network::NodeId;
-use wg_2024::packet::Packet;
+use wg_2024::packet::{Ack, Packet, PacketType};
 
 #[derive(Debug, Clone)]
 pub struct FlyPath {
@@ -51,21 +51,43 @@ impl Drone for FlyPath {
 }
 
 impl FlyPath {
-    // TODO: implement handler
     fn command_handler(&mut self, cmd: DroneCommand) {
         match cmd {
             DroneCommand::AddSender(id, sender) => {
-                self.packet_send.insert(id, sender);
+                if self.packet_send.insert(id, sender).is_some() {
+                    println!("Drone {} updated sender with {}", self.id, id);
+                } else {
+                    println!("Drone {} added sender with {}", self.id, id);
+                }
             }
-            DroneCommand::SetPacketDropRate(dr) => self.pdr = dr,
+            DroneCommand::SetPacketDropRate(pdr) => {
+                self.pdr = pdr;
+                println!("Drone {} new pdr value: {}", self.id, self.pdr);
+            }
             _ => {}
         }
     }
 
-    fn packet_handler(&self, packet: Packet) {}
-
-    pub fn check_conection(&self, id: NodeId) -> bool {
-        self.packet_send.get(&id).is_some()
+    // TODO: implement handler
+    fn packet_handler(&self, packet: Packet) {
+        // read Drone Protocol for the precise description of steps
+        match packet.pack_type {
+            PacketType::FloodRequest(req) => {
+                // TODO: view in Flooding Initialization on Neighbor Response
+            }
+            PacketType::FloodResponse(req) => {
+                // TODO: view in Flooding Initialization on Neighbor Response, forward
+            }
+            PacketType::Ack(ack) => {
+                // TODO: forward
+            }
+            PacketType::Nack(nack) => {
+                // TODO: forward
+            }
+            PacketType::MsgFragment(frag) => {
+                // TODO: fragment are part of a message and can be droopped by drones, if not dropped forward and send an ACK otherwise send a NACK
+            }
+        }
     }
 }
 
@@ -73,18 +95,22 @@ impl FlyPath {
 mod tests {
     use super::*;
     use crossbeam_channel::unbounded;
-    use std::sync::Arc;
-    use std::thread;
+    use std::sync::{Arc, Mutex};
 
+    // example of usage:
+    // let (drone, recv_event, send_command, recv_packet, send_packet) = setup_test_drone(0.0);
+    // let drone_clone = Arc::clone(&drone);
+    // thread::spawn(move || {drone_clone.run});
+    //
     // virtual connected drone's ID is 2.
     fn setup_test_drone(
         pdr: f32,
     ) -> (
-        FlyPath,
+        Arc<Mutex<FlyPath>>,
         Receiver<NodeEvent>,
         Sender<DroneCommand>,
-        Sender<Packet>,
         Receiver<Packet>,
+        Sender<Packet>,
     ) {
         let (drone_event_send, test_event_recv) = unbounded();
         let (test_command_send, drone_command_recv) = unbounded();
@@ -101,23 +127,23 @@ mod tests {
         };
 
         (
-            FlyPath::new(config),
+            Arc::new(Mutex::new(FlyPath::new(config))),
             test_event_recv,
             test_command_send,
-            test_packet_send,
             test_packet_recv,
+            test_packet_send,
         )
     }
 
     // #[test]
     // fn test_drone_crashed() {
-    //     let (drone, reciver_event, sender_command, sender_packet, reciver_packet) = setup_test_drone(0.0);
+    //     let (drone, reciver_event, sender_command, reciver_packet, sender_packet) = setup_test_drone(0.0);
     //     assert!(matches!(sender_command.send(DroneCommand::Crash), Ok(())));
     // }
     //
     // #[test]
     // fn test_add_sender() {
-    //     let (mut drone, reciver_event, sender_command, sender_packet, reciver_packet) = setup_test_drone(0.0);
+    //     let (drone, reciver_event, sender_command, reciver_packet, sender_packet) = setup_test_drone(0.0);
     //     let mut drone_pointer = Arc::new(drone);
     //     let mut pointer_drone_clone = drone_pointer.clone();
     //     let thred = thread::spawn(move || {pointer_drone_clone.run()});
