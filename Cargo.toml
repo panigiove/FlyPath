@@ -7,6 +7,9 @@ edition = "2021"
 crossbeam-channel = "0.5.13"           # Dependency for crossbeam channel
 wg_2024 = { git = "https://github.com/WGL-2024/WGL_repo_2024.git", features = ["serialize", "partial_eq"] }  # Other dependencies for drone
 
+[features]
+modes=[]
+
 [dev-dependencies]
 toml = "0.8.19"
 crossbeam-channel = "0.5.13"

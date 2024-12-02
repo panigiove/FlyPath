@@ -6,6 +6,7 @@ use wg_2024::network::NodeId;
 use wg_2024::packet::{Ack, Packet, PacketType};
 
 #[derive(Debug, Clone)]
+#[cfg(feature = "modes")]
 pub enum FlyPathMode {
     Default,
     Spicy,
@@ -14,13 +15,14 @@ pub enum FlyPathMode {
 
 #[derive(Debug, Clone)]
 pub struct FlyPath {
-    pub mode: FlyPathMode,
     pub id: NodeId,
     pub controller_send: Sender<NodeEvent>,
     pub controller_recv: Receiver<DroneCommand>,
     pub packet_recv: Receiver<Packet>,
     pub packet_send: HashMap<NodeId, Sender<Packet>>,
     pub pdr: f32,
+    #[cfg(feature = "modes")]
+    pub mode: FlyPathMode,
 }
 
 // Implement the Drone trait for FlyPath
@@ -34,6 +36,7 @@ impl Drone for FlyPath {
         pdr: f32,
     ) -> Self {
         Self{
+            #[cfg(feature = "modes")]
             mode: FlyPathMode::Default,
             id,
             controller_send,
@@ -67,7 +70,7 @@ impl Drone for FlyPath {
 }
 
 impl FlyPath {
-
+    #[cfg(feature = "modes")]
     pub fn new_with_mode(
         mode: FlyPathMode,
         id: NodeId,
