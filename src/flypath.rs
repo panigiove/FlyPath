@@ -154,17 +154,8 @@ mod tests {
         let (test_packet_send, drone_packet_recv) = unbounded();
         let (drone_packet_send, test_packet_recv) = unbounded();
 
-        let config: DroneOptions = DroneOptions {
-            id: 1,
-            controller_recv: drone_command_recv,
-            controller_send: drone_event_send,
-            packet_recv: drone_packet_recv,
-            packet_send: vec![(2, drone_packet_send)].into_iter().collect(),
-            pdr,
-        };
-
         (
-            Arc::new(Mutex::new(FlyPath::new(config))),
+            Arc::new(Mutex::new(FlyPath::new(1,drone_event_send, drone_command_recv, drone_packet_recv, vec![(2, drone_packet_send)].into_iter().collect(), pdr))),
             test_event_recv,
             test_command_send,
             test_packet_recv,
