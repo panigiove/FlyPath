@@ -1,12 +1,20 @@
 use crossbeam_channel::{select_biased, Receiver, Sender};
 use std::collections::HashMap;
 use wg_2024::controller::{DroneCommand, NodeEvent};
-use wg_2024::drone::{Drone, DroneOptions};
+use wg_2024::drone::Drone;
 use wg_2024::network::NodeId;
 use wg_2024::packet::{Ack, Packet, PacketType};
 
 #[derive(Debug, Clone)]
+pub enum FlyPathMode {
+    Default,
+    Spicy,
+    BrainRot
+}
+
+#[derive(Debug, Clone)]
 pub struct FlyPath {
+    pub mode: FlyPathMode,
     pub id: NodeId,
     pub controller_send: Sender<NodeEvent>,
     pub controller_recv: Receiver<DroneCommand>,
@@ -17,14 +25,22 @@ pub struct FlyPath {
 
 // Implement the Drone trait for FlyPath
 impl Drone for FlyPath {
-    fn new(options: DroneOptions) -> Self {
-        Self {
-            id: options.id,
-            controller_send: options.controller_send,
-            controller_recv: options.controller_recv,
-            packet_recv: options.packet_recv,
-            packet_send: options.packet_send,
-            pdr: options.pdr,
+    fn new(
+        id: NodeId,
+        controller_send: Sender<NodeEvent>,
+        controller_recv: Receiver<DroneCommand>,
+        packet_recv: Receiver<Packet>,
+        packet_send: HashMap<NodeId, Sender<Packet>>,
+        pdr: f32,
+    ) -> Self {
+        Self{
+            mode: FlyPathMode::Default,
+            id,
+            controller_send,
+            controller_recv,
+            packet_recv,
+            packet_send,
+            pdr,
         }
     }
 
@@ -51,6 +67,27 @@ impl Drone for FlyPath {
 }
 
 impl FlyPath {
+
+    pub fn new_with_mode(
+        mode: FlyPathMode,
+        id: NodeId,
+        controller_send: Sender<NodeEvent>,
+        controller_recv: Receiver<DroneCommand>,
+        packet_recv: Receiver<Packet>,
+        packet_send: HashMap<NodeId, Sender<Packet>>,
+        pdr: f32,
+    ) -> Self {
+        Self{
+            mode,
+            id,
+            controller_send,
+            controller_recv,
+            packet_recv,
+            packet_send,
+            pdr,
+        }
+    }
+
     fn command_handler(&mut self, cmd: DroneCommand) {
         match cmd {
             DroneCommand::AddSender(id, sender) => {
