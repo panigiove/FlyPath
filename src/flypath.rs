@@ -6,13 +6,15 @@ use wg_2024::network::NodeId;
 use wg_2024::packet::{Ack, Packet, PacketType};
 
 #[derive(Debug, Clone)]
-#[cfg(feature = "modes")]
 pub enum FlyPathMode {
     /// The drone behaves as describe in the protocol file.
     Default,
+
+    #[cfg(feature = "modes")]
     // TODO: more documentations on the possible messages
     /// Custom messages based on the selected themes.
     Spicy(FlyPathThemes),
+    #[cfg(feature = "modes")]
     /// The drone behaves erratically, has comptetely gone mad, and it doesn't act like it should. It's dangerous!!!!!!!
     BrainRot,
 }
@@ -42,8 +44,7 @@ pub struct FlyPath {
     pub packet_send: HashMap<NodeId, Sender<Packet>>,
     // packet drop rate
     pub pdr: f32,
-    // drone's mode, optional 
-    #[cfg(feature = "modes")]
+    // drone's mode, optional
     pub mode: FlyPathMode,
 }
 
@@ -57,7 +58,6 @@ impl Drone for FlyPath {
         pdr: f32,
     ) -> Self {
         Self {
-            #[cfg(feature = "modes")]
             mode: FlyPathMode::Default,
             id,
             controller_send,
@@ -112,7 +112,6 @@ impl FlyPath {
         }
     }
 
-    #[cfg(not(feature = "modes"))]
     fn command_handler(&mut self, cmd: DroneCommand) {
         match cmd {
             DroneCommand::AddSender(id, sender) => {
@@ -122,15 +121,17 @@ impl FlyPath {
                     println!("Drone {} added sender with {}", self.id, id);
                 }
             }
+            DroneCommand::RemoveSender(id) => {}
             DroneCommand::SetPacketDropRate(pdr) => {
                 self.pdr = pdr;
                 println!("Drone {} new pdr value: {}", self.id, self.pdr);
             }
             _ => {}
         }
+
+        // in spicy modes here send another messages to the controller
     }
 
-    #[cfg(not(feature = "modes"))]
     // TODO: implement handler
     fn packet_handler(&self, packet: Packet) {
         // read Drone Protocol for the precise description of steps
@@ -152,12 +153,6 @@ impl FlyPath {
             }
         }
     }
-
-    #[cfg(feature = "modes")]
-    fn command_handler(&mut self, cmd: DroneCommand) {}
-
-    #[cfg(feature = "modes")]
-    fn packet_handler(&self, packet: Packet) {}
 }
 
 #[cfg(test)]
@@ -166,7 +161,7 @@ mod tests {
     use crossbeam_channel::unbounded;
 
     // virtual connected drone's ID is 2.
-    fn setup_test_drone_for_threading(
+    fn setup_test_drone(
         pdr: f32,
     ) -> (
         FlyPath,
@@ -201,7 +196,7 @@ mod tests {
     //     let (drone, reciver_event, sender_command, reciver_packet, sender_packet) = setup_test_drone(0.0);
     //     assert!(matches!(sender_command.send(DroneCommand::Crash), Ok(())));
     // }
-    //
+
     // #[test]
     // fn test_add_sender() {
     //     let (drone, reciver_event, sender_command, reciver_packet, sender_packet) = setup_test_drone(0.0);
