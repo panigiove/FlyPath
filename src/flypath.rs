@@ -1,6 +1,6 @@
 use crossbeam_channel::{select_biased, Receiver, Sender};
 use std::collections::HashMap;
-use wg_2024::controller::{DroneCommand, NodeEvent};
+use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::NodeId;
 use wg_2024::packet::{Ack, Packet, PacketType};
@@ -35,7 +35,7 @@ pub enum FlyPathThemes {
 pub struct FlyPath {
     pub id: NodeId,
     // send to controller the NodeEvent
-    pub controller_send: Sender<NodeEvent>,
+    pub controller_send: Sender<DroneEvent>,
     // receive from the controleller a command
     pub controller_recv: Receiver<DroneCommand>,
     // receive a packet from a connected drone
@@ -51,7 +51,7 @@ pub struct FlyPath {
 impl Drone for FlyPath {
     fn new(
         id: NodeId,
-        controller_send: Sender<NodeEvent>,
+        controller_send: Sender<DroneEvent>,
         controller_recv: Receiver<DroneCommand>,
         packet_recv: Receiver<Packet>,
         packet_send: HashMap<NodeId, Sender<Packet>>,
@@ -95,7 +95,7 @@ impl FlyPath {
     pub fn new_with_mode(
         mode: FlyPathMode,
         id: NodeId,
-        controller_send: Sender<NodeEvent>,
+        controller_send: Sender<DroneEvent>,
         controller_recv: Receiver<DroneCommand>,
         packet_recv: Receiver<Packet>,
         packet_send: HashMap<NodeId, Sender<Packet>>,
@@ -165,7 +165,7 @@ mod tests {
         pdr: f32,
     ) -> (
         FlyPath,
-        Receiver<NodeEvent>,
+        Receiver<DroneEvent>,
         Sender<DroneCommand>,
         Receiver<Packet>,
         Sender<Packet>,
