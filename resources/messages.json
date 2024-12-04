@@ -35,13 +35,43 @@
             ]
         },
         "rocket":{
-            "PacketSent": [],
-            "PacketDropped": [],
+            "PacketSent": [
+                "Marco Patrignani: I mean it's not rocket science!",
+                "John Young: The dream is alive.",
+                "Carl Sagan: The universe seems neither begin nor hostile, merely indifferent.",
+                "Neil Armstrong: Houston, Tranquillity Base here. The Eagle has landed."
+            ],
+            "PacketDropped": [
+                "Alan Shepard: Fix your little problem and light this candle.",
+                "Roger B. Chaffee: Problems look mighty small from 150 miles up.",
+                "Louis D. Friedman: [...] But failures happen. [...] That teaches you something. At least it should.",
+                "Samantha Cristoforetti: We did not evolve to go to space, so when it comes to space travel, we are all disabled."
+            ],
             "ControllerShortcut": [],
-            "RemoveSender": [],
-            "AddSender": [],
-            "SetPacketDropRate": [],
-            "Crash": []
+            "RemoveSender": [
+                "Scott Kelly: A year is a long time to live without the human contact of loved ones, fresh air, and gravity, to name a few.",
+                "Duane G. Carey: Those folks out in the space suits are going to be getting beat up.",
+                "Edward White: I'm coming back in and it's the saddest moment of my life.",
+                "Darth Vader: No, I am your father."
+            ],
+            "AddSender": [
+                "Neil Armstrong: That's one small step for man, one giant for mankind.",
+                "Elon Musk: Rockets are cool. There's no getting around that.",
+                "Gus Grissom: Do good work.",
+                "Christa McAuliffe: Space is for everybody. It's not just [...] for a selected group of astronauts.",
+                "Sharon Begley: Somewhere, something incredible is waiting to be known."
+            ],
+            "SetPacketDropRate": [
+                "Konstantin Tsiolkovsky: The earth is the cradle of humanity, but mankind cannot stay in the craddle forever.",
+                "Stephen Hawking: To confine our attention to terrestial matters would be to limit the human spirit.",
+                "Wernher Von Braun: It [the roket] will free the man from his remaining chains."
+            ],
+            "Crash": [
+                "Jack Swigert: Okay, Houston ... we've had a problem.",
+                "Sally Ride: Rocket science is tough, and rockets have a way of failing.",
+                "Stephen Hawking: I don't think the human race will survive the next thousand years, unless we spread into space.",
+                "Luke Skywalker: I have a bad feeling about this."
+            ]
         }
     },
     "brainrot": {

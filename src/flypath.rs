@@ -2,8 +2,8 @@ use crossbeam_channel::{select_biased, Receiver, Sender};
 use rand::Rng;
 use std::collections::HashMap;
 use std::fmt;
-use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::controller::DroneEvent::ControllerShortcut;
+use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
 use wg_2024::packet::NackType::ErrorInRouting;
@@ -196,12 +196,8 @@ impl FlyPath {
                 PacketType::Ack(ack) => {
                     self.packet_sender(packet);
                 }
-                PacketType::FloodRequest(floodrequest) => {
-
-                }
-                PacketType::FloodResponse(floodresponse) => {
-                    
-                }
+                PacketType::FloodRequest(floodrequest) => {}
+                PacketType::FloodResponse(floodresponse) => {}
             }
         } else {
         }
@@ -245,8 +241,10 @@ impl FlyPath {
             .unwrap_or_else(|e| {
                 println!("Error sending packet: {}", e);
                 let nack_packet =
-                self.nack_creator(&packet, NackType::ErrorInRouting(next_hop.clone()));
-                self.controller_send.send(ControllerShortcut(nack_packet)).unwrap();
+                    self.nack_creator(&packet, NackType::ErrorInRouting(next_hop.clone()));
+                self.controller_send
+                    .send(ControllerShortcut(nack_packet))
+                    .unwrap();
             });
     }
 }
