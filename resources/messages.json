@@ -72,6 +72,46 @@
                 "Stephen Hawking: I don't think the human race will survive the next thousand years, unless we spread into space.",
                 "Luke Skywalker: I have a bad feeling about this."
             ]
+        },
+        "quackable": {
+            "PacketSent": [
+                "QuACK! 🦆",
+                "Abigal Gabble: We're not chickens. We're geese.",
+                "It's Quackastic!",
+                "Sometimes I'm smart like Quainstein",
+                "Thanks to my 340° vision, i delivered successfully this packet!",
+                "QUACKet sent!",
+                "Yes Stork! I can deliver babies too.",
+                "I AM IRON QUACK."
+            ],
+            "PacketDropped": [
+                "Watch out for the duck!",
+                "Run away from Abigali and Amelia Gabble before they see you!",
+                "Uncle Wald: It's outrageous! Why, you won't believe what they tried to do to your poor Uncle Waldo",
+                "That's a Quackastrophe!!!",
+                "On my Quack drop the bomb. One... two... three... three and an half.... QUACK!"
+            ],
+            "ControllerShortcut": [],
+            "RemoveSender": [
+                "There is too much Quack ",
+                "Less Quack 🦆",
+                "That motherQuacker. They finally caught him!",
+                "Ah! Is already emigration season! I have to pick up my stuff, but first i have to finish 'Quack Education'."
+            ],
+            "AddSender": [
+                "🦆Quack? 🦆Quack!",
+                "Add a new Qauackable 🦆",
+                "More of Donald Duck!",
+                "YEEEES! A new friend joined Piazza Dante's gang, welcome!"
+            ],
+            "SetPacketDropRate": [],
+            "Crash": [
+                "Oh no! Quack. It's Thanksgiving day. 🍗",
+                "Peking Duck is my favourite dish! 🙃",
+                "Abigali Gabble: Amelia, if I walk any further, I'll get flat feet.",
+                "sQuack...💀",
+                "Good job son, we caught three ducks today."
+            ]
         }
     },
     "brainrot": {
