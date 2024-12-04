@@ -1,6 +1,6 @@
 {
     "spicy": {
-        "batman":{
+        "Batman":{
             "PacketSent": [
                 "Batman: Sent the message to Gordon.", 
                 "Oracle: I've sent the position of Mr. Freeze.", 
@@ -34,7 +34,7 @@
                 "Talia al Ghul: I have always loved you. Farewell."
             ]
         },
-        "rocket":{
+        "Rocket":{
             "PacketSent": [
                 "Marco Patrignani: I mean it's not rocket science!",
                 "John Young: The dream is alive.",
@@ -73,7 +73,7 @@
                 "Luke Skywalker: I have a bad feeling about this."
             ]
         },
-        "quackable": {
+        "Quackable": {
             "PacketSent": [
                 "QuACK! 🦆",
                 "Abigal Gabble: We're not chickens. We're geese.",
