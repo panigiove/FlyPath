@@ -3,6 +3,7 @@ use rand::Rng;
 use std::collections::HashMap;
 use std::fmt;
 use wg_2024::controller::{DroneCommand, DroneEvent};
+use wg_2024::controller::DroneEvent::ControllerShortcut;
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
 use wg_2024::packet::NackType::ErrorInRouting;
@@ -189,10 +190,18 @@ impl FlyPath {
                         self.packet_sender(packet);
                     }
                 }
-                PacketType::Nack(_) => {}
-                PacketType::Ack(_) => {}
-                PacketType::FloodRequest(_) => {}
-                PacketType::FloodResponse(_) => {}
+                PacketType::Nack(nack) => {
+                    self.packet_sender(packet);
+                }
+                PacketType::Ack(ack) => {
+                    self.packet_sender(packet);
+                }
+                PacketType::FloodRequest(floodrequest) => {
+
+                }
+                PacketType::FloodResponse(floodresponse) => {
+                    
+                }
             }
         } else {
         }
@@ -236,8 +245,8 @@ impl FlyPath {
             .unwrap_or_else(|e| {
                 println!("Error sending packet: {}", e);
                 let nack_packet =
-                    self.nack_creator(&packet, NackType::ErrorInRouting(next_hop.clone()));
-                self.controller_send.send(nack_packet);
+                self.nack_creator(&packet, NackType::ErrorInRouting(next_hop.clone()));
+                self.controller_send.send(ControllerShortcut(nack_packet)).unwrap();
             });
     }
 }
