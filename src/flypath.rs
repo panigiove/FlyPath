@@ -1,14 +1,15 @@
 use crossbeam_channel::{select_biased, Receiver, Sender};
+use rand::Rng;
 use std::collections::HashMap;
+use std::fmt;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{Ack, Nack, NackType, Packet, PacketType};
 use wg_2024::packet::NackType::ErrorInRouting;
-use rand::Rng;
+use wg_2024::packet::{Ack, Nack, NackType, Packet, PacketType};
 
 #[derive(Debug, Clone)]
-pub enum FlyPathMode {
+pub enum FlyPathModes {
     /// The drone behaves as describe in the protocol file.
     Default,
 
@@ -16,6 +17,7 @@ pub enum FlyPathMode {
     // TODO: more documentations on the possible messages
     /// Custom messages based on the selected themes.
     Spicy(FlyPathThemes),
+
     #[cfg(feature = "modes")]
     /// The drone behaves erratically, has comptetely gone mad, and it doesn't act like it should. It's dangerous!!!!!!!
     BrainRot,
@@ -26,17 +28,33 @@ pub enum FlyPathMode {
 pub enum FlyPathThemes {
     Batman,
     Rocket,
-    Quackable,
-    HarryPotter,
-    GerryScotty,
-    DarkSoulAndBloodborn,
-    Pingu,
+    // Quackable,
+    // HarryPotter,
+    // GerryScotty,
+    // DarkSoulAndBloodborn,
+    // Pingu,
+}
+
+#[cfg(feature = "modes")]
+impl fmt::Display for FlyPathThemes {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let theme_str = match self {
+            FlyPathThemes::Batman => "Batman",
+            FlyPathThemes::Rocket => "Rocket",
+            // FlyPathThemes::Quackable => "Quackable",
+            // FlyPathThemes::HarryPotter => "HarryPotter",
+            // FlyPathThemes::GerryScotty => "GerryScotty",
+            // FlyPathThemes::DarkSoulAndBloodborn => "DarkSoulAndBloodborn",
+            // FlyPathThemes::Pingu => "Pingu",
+        };
+        write!(f, "{}", theme_str)
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct FlyPath {
     pub id: NodeId,
-    // send to controller the NodeEvent
+    // send to controller the DroneEvent
     pub controller_send: Sender<DroneEvent>,
     // receive from the controleller a command
     pub controller_recv: Receiver<DroneCommand>,
@@ -47,7 +65,7 @@ pub struct FlyPath {
     // packet drop rate
     pub pdr: f32,
     // drone's mode, optional
-    pub mode: FlyPathMode,
+    pub mode: FlyPathModes,
 }
 
 impl Drone for FlyPath {
@@ -60,7 +78,7 @@ impl Drone for FlyPath {
         pdr: f32,
     ) -> Self {
         Self {
-            mode: FlyPathMode::Default,
+            mode: FlyPathModes::Default,
             id,
             controller_send,
             controller_recv,
@@ -95,7 +113,7 @@ impl Drone for FlyPath {
 impl FlyPath {
     #[cfg(feature = "modes")]
     pub fn new_with_mode(
-        mode: FlyPathMode,
+        mode: FlyPathModes,
         id: NodeId,
         controller_send: Sender<DroneEvent>,
         controller_recv: Receiver<DroneCommand>,
@@ -143,7 +161,8 @@ impl FlyPath {
 
         if packet.routing_header.hops[hop_index] != self.id {
             let nack_packet = self.nack_creator(&packet, NackType::UnexpectedRecipient(self.id));
-            self.controller_send(DroneEvent::ControllerShortcut(nack_packet));
+            self.controller_send
+                .send(DroneEvent::ControllerShortcut(nack_packet));
             return;
         }
 
@@ -155,17 +174,18 @@ impl FlyPath {
             return;
         }
 
-        if self.packet_send.contains_key(&packet.routing_header.hops[packet.routing_header.hop_index]) {
-
+        if self
+            .packet_send
+            .contains_key(&packet.routing_header.hops[packet.routing_header.hop_index])
+        {
             match &packet.pack_type {
                 PacketType::MsgFragment(frag) => {
                     let mut rng = rand::thread_rng();
-                    let random_number= rng.gen_range(0.0..1.0);
+                    let random_number = rng.gen_range(0.0..1.0);
                     if random_number > self.pdr {
                         let nack_packet = self.nack_creator(&packet, NackType::Dropped);
                         self.packet_sender(nack_packet);
-                    }
-                    else{
+                    } else {
                         self.packet_sender(packet);
                     }
                 }
@@ -174,9 +194,7 @@ impl FlyPath {
                 PacketType::FloodRequest(_) => {}
                 PacketType::FloodResponse(_) => {}
             }
-        }
-        else{
-
+        } else {
         }
     }
 
@@ -185,25 +203,17 @@ impl FlyPath {
         reverse_hops.truncate(packet.routing_header.hop_index);
         reverse_hops.reverse();
 
-        let nack = Nack{
+        let nack = Nack {
             fragment_index: match &packet.pack_type {
-                PacketType::Ack(ack) => {
-                    ack.fragment_index
-                }
-                PacketType::Nack(nack) => {
-                    nack.fragment_index
-                }
-                PacketType::MsgFragment(frag) => {
-                    frag.fragment_index
-                }
-                _ => {
-                    0
-                }
+                PacketType::Ack(ack) => ack.fragment_index,
+                PacketType::Nack(nack) => nack.fragment_index,
+                PacketType::MsgFragment(frag) => frag.fragment_index,
+                _ => 0,
             },
             nack_type,
         };
 
-        Packet{
+        Packet {
             pack_type: PacketType::Nack(nack),
             routing_header: SourceRoutingHeader {
                 hop_index: 1,
@@ -219,13 +229,16 @@ impl FlyPath {
 
     fn packet_sender(&self, packet: Packet) {
         let next_hop = &packet.routing_header.hops[packet.routing_header.hop_index];
-        self.packet_send.get(next_hop).unwrap().send(packet).unwrap_or_else(
-            |e| {
+        self.packet_send
+            .get(next_hop)
+            .unwrap()
+            .send(packet)
+            .unwrap_or_else(|e| {
                 println!("Error sending packet: {}", e);
-                let nack_packet = self.nack_creator(&packet, NackType::ErrorInRouting(next_hop.clone()));
-                self.controller_send(nack_packet);
-            }
-        );
+                let nack_packet =
+                    self.nack_creator(&packet, NackType::ErrorInRouting(next_hop.clone()));
+                self.controller_send.send(nack_packet);
+            });
     }
 }
 
@@ -238,7 +251,7 @@ mod tests {
     fn setup_test_drone(
         pdr: f32,
     ) -> (
-        Arc<Mutex<FlyPath>>,
+        FlyPath,
         Receiver<DroneEvent>,
         Sender<DroneCommand>,
         Receiver<Packet>,

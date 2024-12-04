@@ -1,0 +1,56 @@
+{
+    "spicy": {
+        "batman":{
+            "PacketSent": [
+                "Batman: Sent the message to Gordon.", 
+                "Oracle: I've sent the position of Mr. Freeze.", 
+                "Riddler: HA HA HA... you are not smart enough to stop me Batman.",
+                "Joker: You think you can stop me, Batman? You can’t even stop my packets!"
+            ],
+            "PacketDropped": [
+                "Batman: Joker is intercepting my transmission. I need to find him.", 
+                "Penguin: Screw you, Batman! Those are my packets!", 
+                "Scarecrow: Fear will prevail, even if you find my toxin transport"
+            ],
+            "ControllerShortcut": [],
+            "RemoveSender": [
+                "Oracle: I lost connection to Robin. Batman, go check on him.", 
+                "Harley Quinn: NOO! Jokie, I lost the connection to my Pookie.",
+                "Arkham Knight: I can't hear my militia communications, I have been cut off."
+            ],
+            "AddSender": [
+                "Gordon: Oh finally! I can call Barbara.", 
+                "Deadshot: My next target is in my sight....BAM!", 
+                "Dick Grayson: I saw Penguin with Two-Face. I dont like this. I will call Bruce.", 
+                "Batman: Thanks, Lucius. Now I can hear Penguin's encrypted transmissions."
+            ],
+            "SetPacketDropRate": [],
+            "Crash": [
+                "Hugo Strange: NOOO you can't lock me in, Batman, I know your secret... YOU ARE B... SMASH!", 
+                "Scarecrow: I will return, Batman, and I will hurt your family.", 
+                "Mister Freeze: Nora, I am sorry.", 
+                "Joker: Am dying? AH AH Ah coff AH AH Ah ah...", 
+                "Harley Quinn: Don't leave me, Jokey... please!",
+                "Talia al Ghul: I have always loved you. Farewell."
+            ]
+        },
+        "rocket":{
+            "PacketSent": [],
+            "PacketDropped": [],
+            "ControllerShortcut": [],
+            "RemoveSender": [],
+            "AddSender": [],
+            "SetPacketDropRate": [],
+            "Crash": []
+        }
+    },
+    "brainrot": {
+        "PacketSent": [],
+        "PacketDropped": [],
+        "ControllerShortcut": [],
+        "RemoveSender": [],
+        "AddSender": [],
+        "SetPacketDropRate": [],
+        "Crash": []
+    }
+}
