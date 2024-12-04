@@ -1,8 +1,12 @@
 use crate::flypath::FlyPathModes;
 use rand::Rng;
 use serde::Deserialize;
-use std::{collections::HashMap, fs};
-use wg_2024::controller::{DroneCommand, DroneEvent};
+use std::{collections::HashMap, fs, u64};
+use wg_2024::{
+    controller::{DroneCommand, DroneEvent},
+    network::{NodeId, SourceRoutingHeader},
+    packet::{Fragment, Packet, PacketType, FRAGMENT_DSIZE},
+};
 
 /// Rapresent the collection of messages loaded from a JSON file
 ///
@@ -54,8 +58,13 @@ impl Messages {
             .map_err(|e| format!("Failed to parse the message JSON: {}", e))
     }
 
-    // The actual function that retrieves messages based on the provided mode and event/command.
-    fn get_messages_for_mode(
+    /// Takes a `FlyPathModes` and an event or command (converted to a string using `Messages::drone_event_to_string` or `Messages::drone_command_to_string`)
+    /// and retrieves a clone of the messages for the specified event/command and mode from the `Messages` struct.
+    ///
+    /// # Returns
+    /// - `Some(Vec<String>)`: A vector of messages for the specified event/command and mode.
+    /// - `None`: If no messages are found.
+    pub fn get_messages_for_mode(
         &self,
         mode: &FlyPathModes,
         event_or_command: &str,
@@ -76,15 +85,6 @@ impl Messages {
         }
     }
 
-    /// Takes a `FlyPathModes` and an event or command (converted to a string using `Messages::drone_event_to_string` or `Messages::drone_command_to_string`) and retrieves a clone of the messages for the specified event/command and mode from the `Messages` struct.
-    ///
-    /// # Returns
-    /// - `Some(Vec<String>)`: A vector of messages for the specified event/command and mode.
-    /// - `None`: If no messages are found.
-    pub fn get_messages(&self, mode: &FlyPathModes, event_or_command: &str) -> Option<Vec<String>> {
-        self.get_messages_for_mode(mode, event_or_command)
-    }
-
     /// Retrieves a random message for the given mode and event/command.
     ///
     /// # Returns
@@ -96,6 +96,64 @@ impl Messages {
                 let rand_index = rand::thread_rng().gen_range(0..messages.len());
                 Some(messages[rand_index].clone())
             })
+    }
+
+    /// Generate a special NodeEvent to the controller that is reconizable and contains a random message for that mode and themes
+    ///
+    /// #`packet::Packet`
+    /// - `pack_type`: MsgFragment(Fragment{
+    ///         - `fragment_index`: max value of u64,
+    ///         - `total_n_framgents`: 0,
+    ///         - `length`: real len of message`s bytes,
+    ///         - `data`: message in bytes
+    ///    })
+    /// - `routing_header`: SourceRoutingHeader{
+    ///         - `hop_index`: max number of possible hops,
+    ///         - `hops`: hops list is empty
+    ///    }
+    /// - `session_id`: max value of u64
+    ///
+    /// # Returns
+    /// - `Ok(None)`: Does not exist a message for that mode and that event/command
+    /// - `Ok(Some(DroneEvent))`: DroneEvent is the event that can be sended to the controller
+    /// - `Ok(Err(String))`: the message is too and can not contained inside a `Fragment`, TOO LONG means that the number of UTF-2 bytes that encode the message is too long
+    ///
+    pub fn generate_droneEvent_to_controller(
+        &self,
+        mode: &FlyPathModes,
+        event_or_command: &str,
+        nodeId: NodeId,
+    ) -> Result<Option<DroneEvent>, String> {
+        if let Some(message) = self.get_rand_message(mode, event_or_command) {
+            let bytes = message.into_bytes();
+            if bytes.len() > FRAGMENT_DSIZE {
+                Err(format!("Failed to generate a message: Too Long"))
+            } else {
+                let fragment = Fragment {
+                    fragment_index: u64::MAX,
+                    total_n_fragments: 0,
+                    length: bytes.len() as u8,
+                    data: {
+                        let mut data = [0; FRAGMENT_DSIZE];
+                        data[..bytes.len()].copy_from_slice(&bytes);
+                        data
+                    },
+                };
+
+                let packet = Packet {
+                    pack_type: PacketType::MsgFragment(fragment),
+                    routing_header: SourceRoutingHeader {
+                        hop_index: usize::MAX,
+                        hops: vec![nodeId], // with this che controller know the sender
+                    },
+                    session_id: u64::MAX,
+                };
+
+                Ok(Some(DroneEvent::PacketSent(packet)))
+            }
+        } else {
+            Ok(None)
+        }
     }
 
     /// Convert the DroneEvent to String, necessary for lookup the messages
@@ -118,8 +176,49 @@ impl Messages {
     }
 }
 
+/// Identifies and extracts a FlyPath message from a given `DroneEvent`.
+///
+/// # Returns
+/// - `Some((NodeId, String))`:
+///   - `NodeId`: The identifier of the FlyPath drone operating in spicy mode.
+///   - `String`: The themed message associated with the event.
+/// - `None`: If the event is a normal `DroneEvent` or invalid as a FlyPath event.
+///
+/// # Examples
+/// ```rust
+/// // Assuming `event` is a valid FlyPath DroneEvent:
+/// if let Some((node_id, message)) = identify_flypath_event(&event) {
+///     println!("FlyPath Event Detected! Node: {}, Message: {}", node_id, message);
+/// } else {
+///     println!("This is not a FlyPath event.");
+/// }
+/// ```
+pub fn extract_flypath_message(event: &DroneEvent) -> Option<(NodeId, String)> {
+    if let DroneEvent::PacketSent(packet) = event {
+        if let PacketType::MsgFragment(fragment) = &packet.pack_type {
+            if packet.session_id == u64::MAX
+                && packet.routing_header.hop_index == usize::MAX
+                && !packet.routing_header.hops.is_empty()
+                && packet.routing_header.hops.len() == 1
+                && fragment.fragment_index == u64::MAX
+                && fragment.total_n_fragments == 0
+            {
+                // We can assume for sure that this special invalid Fragment is FlyPath Fragment
+                let node_id = packet.routing_header.hops.get(0).unwrap();
+                return Some((
+                    *node_id,
+                    String::from_utf8_lossy(&fragment.data[..fragment.length as usize]).to_string(),
+                ));
+            }
+        }
+    }
+    None // Return None if event is not a FlyPath DroneEvent
+}
+
 #[cfg(test)]
 mod tests {
+    use std::result;
+
     use super::*;
     use crate::flypath::FlyPathThemes;
 
@@ -128,7 +227,7 @@ mod tests {
         let json_data = r#"
         {
             "spicy": {
-                "batman": {
+                "Batman": {
                     "PacketSent": ["Message1", "Message2"],
                     "PacketDropped": [],
                     "ControllerShortcut": [],
@@ -172,66 +271,6 @@ mod tests {
             .unwrap_err()
             .contains("Failed to parse the message JSON"));
         fs::remove_file(file_path).unwrap();
-    }
-
-    #[test]
-    fn test_get_messages() {
-        let json_data = r#"
-        {
-            "spicy": {
-                "Batman": {
-                    "Crash": ["Mister Freeze", "Talia al Ghul"]
-                },
-                "Rocket": {
-                    "Crash": []
-                }
-            },
-            "brainrot": {
-                "Crash": ["feafie", "feaff"]
-            }
-        }
-        "#;
-        let file_path = "test_messages.json";
-        std::fs::write(file_path, json_data).expect("Failed to write test file");
-
-        let messages: Messages = Messages::load_from_file(file_path).unwrap();
-
-        // Test 1: Valid case
-        {
-            let mode = &FlyPathModes::Spicy(FlyPathThemes::Batman);
-            let event_or_command = Messages::drone_command_to_string(&DroneCommand::Crash);
-            let actual = messages.get_messages(mode, &event_or_command).unwrap();
-            let expected = vec!["Mister Freeze", "Talia al Ghul"];
-            assert_eq!(
-                expected, actual,
-                "Expected messages do not match for Spicy/Batman mode and Crash event"
-            );
-        }
-
-        // Test 2: Empty messages
-        {
-            let mode = &FlyPathModes::Spicy(FlyPathThemes::Rocket);
-            let event_or_command = Messages::drone_command_to_string(&DroneCommand::Crash);
-            let actual = messages.get_messages(mode, &event_or_command);
-            assert!(
-                actual.is_none(),
-                "Expected no messages for Spicy/Rocket mode and Crash event, but got some"
-            );
-        }
-
-        // Test 3: Non-existent event
-        {
-            let mode = &FlyPathModes::Spicy(FlyPathThemes::Batman);
-            let event_or_command = "NonExistentEvent";
-            let actual = messages.get_messages(mode, event_or_command);
-            assert!(
-                actual.is_none(),
-                "Expected no messages for Spicy/Rocket mode and and non-existent event, but got some"
-            );
-        }
-
-        // Cleanup test file
-        std::fs::remove_file(file_path).unwrap()
     }
 
     #[test]
@@ -306,6 +345,181 @@ mod tests {
             );
 
             std::fs::remove_file(file_path).unwrap();
+        }
+
+        // Case: No message
+        {
+            let json_data = r#"
+            {
+                "spicy": {
+                    "Batman": {
+                        "Crash": []
+                    }
+                },
+                "brainrot":{}
+            }
+            "#;
+            let file_path = "test_no_message.json";
+            std::fs::write(file_path, json_data).expect("Failed to write test file");
+
+            let messages: Messages = Messages::load_from_file(file_path).unwrap();
+            let mode = &FlyPathModes::Spicy(FlyPathThemes::Batman);
+            let event_or_command = Messages::drone_command_to_string(&DroneCommand::Crash);
+
+            let rand_message = messages.get_rand_message(mode, &event_or_command);
+            assert!(
+                rand_message.is_none(),
+                "Expected no message to be returned, but got '{:?}'",
+                rand_message
+            );
+
+            std::fs::remove_file(file_path).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_generate_nodeEvent_to_controller() {
+        // Case: Valid Test
+        {
+            let json_data = r#"
+            {
+                "spicy": {
+                    "Batman": {
+                        "Crash": ["singlemessage", "secondmessage"]
+                    }
+                },
+                "brainrot":{}
+            }
+            "#;
+            let file_path = "test_generate_nodeevent_to_controller.json";
+            std::fs::write(file_path, json_data).expect("Failed to write test file");
+
+            let messages: Messages = Messages::load_from_file(file_path).unwrap();
+            let mode = &FlyPathModes::Spicy(FlyPathThemes::Batman);
+            let event_or_command = Messages::drone_command_to_string(&DroneCommand::Crash);
+
+            let result = messages.generate_droneEvent_to_controller(mode, event_or_command, 1);
+            assert!(
+                result.as_ref().is_ok_and(|x| x.is_some()),
+                "Expected to find a message and generate a DroneEvent, but got '{:?}'",
+                result
+            );
+
+            std::fs::remove_file(file_path).unwrap();
+        }
+
+        // Case: Message Too Long
+        {
+            let json_data = r#"
+            {
+                "spicy": {
+                    "Batman": {
+                        "Crash": ["129CharLongStringFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFillFill"]
+                    }
+                },
+                "brainrot":{}
+            }
+            "#;
+            let file_path = "test_generate_nodeevent_to_controller.json";
+            std::fs::write(file_path, json_data).expect("Failed to write test file");
+
+            let messages: Messages = Messages::load_from_file(file_path).unwrap();
+            let mode = &FlyPathModes::Spicy(FlyPathThemes::Batman);
+            let event_or_command = Messages::drone_command_to_string(&DroneCommand::Crash);
+            let result = messages.generate_droneEvent_to_controller(mode, event_or_command, 1);
+            assert!(result
+                .unwrap_err()
+                .contains("Failed to generate a message: Too Long"));
+
+            std::fs::remove_file(file_path).unwrap();
+        }
+
+        // Case: No Message
+        {
+            let json_data = r#"
+            {
+                "spicy": {
+                    "Batman": {
+                        "Crash": []
+                    }
+                },
+                "brainrot":{}
+            }
+            "#;
+            let file_path = "test_generate_nodeevent_to_controller.json";
+            std::fs::write(file_path, json_data).expect("Failed to write test file");
+
+            let messages: Messages = Messages::load_from_file(file_path).unwrap();
+            let mode = &FlyPathModes::Spicy(FlyPathThemes::Batman);
+            let event_or_command = Messages::drone_command_to_string(&DroneCommand::Crash);
+            let result = messages.generate_droneEvent_to_controller(mode, event_or_command, 1);
+            assert!(
+                result.as_ref().is_ok_and(|x| x.is_none()),
+                "Expected to find a message and generate a DroneEvent, but got '{:?}'",
+                result
+            );
+
+            std::fs::remove_file(file_path).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_extract_flypath_message() {
+        // Case: FlyPath DroneEvent
+        {
+            let json_data = r#"
+            {
+                "spicy": {
+                    "Batman": {
+                        "Crash": ["singlemessage"]
+                    }
+                },
+                "brainrot":{}
+            }
+            "#;
+            let file_path = "test_generate_nodeevent_to_controller.json";
+            std::fs::write(file_path, json_data).expect("Failed to write test file");
+
+            let messages: Messages = Messages::load_from_file(file_path).unwrap();
+            let mode = &FlyPathModes::Spicy(FlyPathThemes::Batman);
+            let event_or_command = Messages::drone_command_to_string(&DroneCommand::Crash);
+
+            let droneEvent = messages
+                .generate_droneEvent_to_controller(mode, event_or_command, 1)
+                .unwrap()
+                .unwrap();
+
+            let result = extract_flypath_message(&droneEvent);
+            let expect: Option<(NodeId, String)> = Some((1, "singlemessage".to_string()));
+
+            assert_eq!(result, expect);
+        }
+
+        // Case: Normal DroneEvent
+        {
+            let normal_event = DroneEvent::PacketSent(Packet {
+                pack_type: PacketType::MsgFragment(Fragment {
+                    fragment_index: u64::MAX - 1,
+                    total_n_fragments: u64::MAX,
+                    length: 13,
+                    data: [
+                        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                        0, 0, 0,
+                    ],
+                }),
+                routing_header: SourceRoutingHeader {
+                    hop_index: 2,
+                    hops: vec![1, 2, 3],
+                },
+                session_id: 1,
+            });
+
+            let result = extract_flypath_message(&normal_event);
+            assert!(result.is_none(), "Expect to find None but got {:?}", result)
         }
     }
 }
