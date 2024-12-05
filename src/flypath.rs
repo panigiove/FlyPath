@@ -6,8 +6,7 @@ use wg_2024::controller::DroneEvent::ControllerShortcut;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::NackType::ErrorInRouting;
-use wg_2024::packet::{Ack, Nack, NackType, NodeType, Packet, PacketType};
+use wg_2024::packet::{Ack, FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
 
 #[derive(Debug, Clone)]
 pub enum FlyPathModes {
@@ -157,76 +156,81 @@ impl FlyPath {
     }
 
     // TODO: implement handler
-    fn packet_handler(&mut self, packet: Packet) {
+    fn packet_handler(&mut self, mut packet: Packet) {
         // read Drone Protocol for the precise description of steps
 
-        let mut hop_index = packet.routing_header.hop_index.clone();
-        let mut clone_packet = packet.clone();
-
-        if packet.routing_header.hops[hop_index] != self.id {
-            let nack_packet = self.nack_creator(&packet, NackType::UnexpectedRecipient(self.id));
-            self.controller_send
-                .send(ControllerShortcut(nack_packet))
-                .unwrap();
-            return;
-        }
-
-        hop_index += 1;
-
-        if hop_index == packet.routing_header.hops.len() {
-            let nack_packet = self.nack_creator(&packet, NackType::DestinationIsDrone);
-            self.controller_sender(ControllerShortcut(nack_packet));
-            return;
-        }
-
-        if self
-            .packet_send
-            .contains_key(&packet.routing_header.hops[packet.routing_header.hop_index])
-        {
-            match &packet.pack_type {
-                PacketType::MsgFragment(frag) => {
-                    let mut rng = rand::thread_rng();
-                    let random_number = rng.gen_range(0.0..1.0);
-                    if random_number > self.pdr {
-                        let nack_packet = self.nack_creator(&packet, NackType::Dropped);
-                        self.packet_sender(nack_packet.clone());
-                        self.controller_sender(DroneEvent::PacketSent(nack_packet));
-                    } else {
-                        self.packet_sender(packet.clone());
-                        self.controller_sender(DroneEvent::PacketSent(packet));
-                    }
-                }
-                PacketType::Nack(nack) => {
-                    self.packet_sender(packet.clone());
-                    self.controller_sender(DroneEvent::PacketSent(packet));
-                }
-                PacketType::Ack(ack) => {
-                    self.packet_sender(packet.clone());
-                    self.controller_sender(DroneEvent::PacketSent(packet));
-                }
-                PacketType::FloodRequest(mut floodrequest) => {
-                    if !self.precFloodId.contains_key(&floodrequest.flood_id) {
-                        self.precFloodId
-                            .insert(floodrequest.flood_id, floodrequest.flood_id);
-                        for i in self
-                            .packet_send
-                            .keys()
-                            .filter(|&x| x != floodrequest.flood_id)
-                        {
-                            floodrequest.path_trace.push((self.id, NodeType::Drone));
-                            self.packet_send
-                                .get(i)
-                                .unwrap()
-                                .send(packet.clone())
-                                .unwrap();
+        match &packet.pack_type {
+            PacketType::FloodRequest(ref mut floodrequest) => {
+                if !self.precFloodId.contains_key(&floodrequest.flood_id) {
+                    let mut no_neightbours = true;
+                    self.precFloodId
+                        .insert(floodrequest.flood_id, floodrequest.flood_id);
+                    floodrequest.path_trace.push((self.id, NodeType::Drone));
+                    for (i, j) in self
+                        .packet_send
+                    {
+                        if i != floodrequest.path_trace[floodrequest.path_trace.len() - 2].0 {
+                            self.packet_sender(packet.clone());
                             self.controller_sender(DroneEvent::PacketSent(packet.clone()));
+                            no_neightbours = false;
                         }
-                    } else {
                     }
+                    if !no_neightbours {
+                        let floodresponse = self.floodresponse_creator(&packet, floodrequest);
+                        self.packet_sender(floodresponse);
+                    }
+                } else {
+                    floodrequest.path_trace.push((self.id, NodeType::Drone));
+                    let floodresponse = self.floodresponse_creator(&packet, floodrequest);
+                    self.packet_sender(floodresponse);
                 }
-                PacketType::FloodResponse(floodresponse) => {}
             }
-        } else {
+            _ =>{
+                if packet.routing_header.hops[packet.routing_header.hop_index] != self.id {
+                    let nack_packet = self.nack_creator(&packet, NackType::UnexpectedRecipient(self.id));
+                    self.controller_send
+                        .send(ControllerShortcut(nack_packet))
+                        .unwrap();
+                    return;
+                }
+
+                packet.routing_header.hop_index += 1;
+                let next_hop = packet.routing_header.hop_index;
+
+                if next_hop == packet.routing_header.hops.len() {
+                    let nack_packet = self.nack_creator(&packet, NackType::DestinationIsDrone);
+                    self.controller_sender(ControllerShortcut(nack_packet));
+                    return;
+                }
+
+                if self
+                    .packet_send
+                    .contains_key(&packet.routing_header.hops[packet.routing_header.hop_index])
+                {
+                    match &packet.pack_type {
+                        PacketType::MsgFragment(frag) => {
+                            let mut rng = rand::thread_rng();
+                            let random_number = rng.gen_range(0.0..1.0);
+                            if random_number > self.pdr {
+                                let nack_packet = self.nack_creator(&packet, NackType::Dropped);
+                                self.packet_sender(nack_packet.clone());
+                                self.controller_sender(DroneEvent::PacketSent(nack_packet));
+                            } else {
+                                self.packet_sender(packet.clone());
+                                self.controller_sender(DroneEvent::PacketSent(packet));
+                            }
+                        }
+                        _ => {
+                            self.packet_sender(packet.clone());
+                            self.controller_sender(DroneEvent::PacketSent(packet));
+                        }
+                    }
+                } else {
+                    let nack_packet = self.nack_creator(&packet, NackType::ErrorInRouting(packet.routing_header.hops[packet.routing_header.hop_index]));
+                    self.packet_sender(nack_packet.clone());
+                    self.controller_sender(DroneEvent::PacketSent(nack_packet));
+                }
+            }
         }
     }
 
@@ -247,6 +251,28 @@ impl FlyPath {
 
         Packet {
             pack_type: PacketType::Nack(nack),
+            routing_header: SourceRoutingHeader {
+                hop_index: 1,
+                hops: reverse_hops,
+            },
+            session_id: packet.session_id,
+        }
+    }
+
+    fn floodresponse_creator(&self, packet: &Packet, flood_request: &mut FloodRequest) -> Packet{
+        let mut reverse_hops = Vec::new();
+        for (i, j) in flood_request.path_trace.clone(){
+            reverse_hops.push(i);
+        }
+        reverse_hops.reverse();
+        
+        let floodresponse = FloodResponse {
+            flood_id: flood_request.flood_id,
+            path_trace: flood_request.path_trace.clone(),
+        };
+
+        Packet{
+            pack_type: PacketType::FloodResponse(floodresponse),
             routing_header: SourceRoutingHeader {
                 hop_index: 1,
                 hops: reverse_hops,
