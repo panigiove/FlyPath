@@ -6,7 +6,7 @@ use wg_2024::controller::DroneEvent::ControllerShortcut;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{Ack, FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
+use wg_2024::packet::{FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
 
 #[derive(Debug, Clone)]
 pub enum FlyPathModes {
@@ -160,28 +160,28 @@ impl FlyPath {
         // read Drone Protocol for the precise description of steps
 
         match &packet.pack_type {
-            PacketType::FloodRequest(ref mut floodrequest) => {
+            PacketType::FloodRequest(req) => {
+                let mut floodrequest = req.clone();
                 if !self.precFloodId.contains_key(&floodrequest.flood_id) {
                     let mut no_neightbours = true;
                     self.precFloodId
                         .insert(floodrequest.flood_id, floodrequest.flood_id);
                     floodrequest.path_trace.push((self.id, NodeType::Drone));
-                    for (i, j) in self
-                        .packet_send
-                    {
-                        if i != floodrequest.path_trace[floodrequest.path_trace.len() - 2].0 {
-                            self.packet_sender(packet.clone());
-                            self.controller_sender(DroneEvent::PacketSent(packet.clone()));
+                    let new_floodrequest= self.floodrequest_creator(&packet, floodrequest.clone());
+                    for (i, j) in &self.packet_send {
+                        if *i != floodrequest.path_trace[floodrequest.path_trace.len() - 2].0 {
+                            self.packet_sender(new_floodrequest.clone());
+                            self.controller_sender(DroneEvent::PacketSent(new_floodrequest.clone()));
                             no_neightbours = false;
                         }
                     }
                     if !no_neightbours {
-                        let floodresponse = self.floodresponse_creator(&packet, floodrequest);
+                        let floodresponse = self.floodresponse_creator(&packet, &floodrequest);
                         self.packet_sender(floodresponse);
                     }
                 } else {
                     floodrequest.path_trace.push((self.id, NodeType::Drone));
-                    let floodresponse = self.floodresponse_creator(&packet, floodrequest);
+                    let floodresponse = self.floodresponse_creator(&packet, &floodrequest);
                     self.packet_sender(floodresponse);
                 }
             }
@@ -214,6 +214,7 @@ impl FlyPath {
                             if random_number > self.pdr {
                                 let nack_packet = self.nack_creator(&packet, NackType::Dropped);
                                 self.packet_sender(nack_packet.clone());
+                                self.controller_sender(DroneEvent::PacketDropped(packet.clone()));
                                 self.controller_sender(DroneEvent::PacketSent(nack_packet));
                             } else {
                                 self.packet_sender(packet.clone());
@@ -259,7 +260,18 @@ impl FlyPath {
         }
     }
 
-    fn floodresponse_creator(&self, packet: &Packet, flood_request: &mut FloodRequest) -> Packet{
+    fn floodrequest_creator(&self, packet: &Packet, floodrequest: FloodRequest) -> Packet {
+        Packet{
+            pack_type: PacketType::FloodRequest(floodrequest),
+            routing_header: SourceRoutingHeader {
+                hop_index: 0,
+                hops: Vec::new(),
+            },
+            session_id: packet.session_id,
+        }
+    }
+
+    fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet{
         let mut reverse_hops = Vec::new();
         for (i, j) in flood_request.path_trace.clone(){
             reverse_hops.push(i);
@@ -286,11 +298,11 @@ impl FlyPath {
     }
 
     fn packet_sender(&self, packet: Packet) {
-        let next_hop = &packet.routing_header.hops[packet.routing_header.hop_index];
+        let next_hop = packet.routing_header.hops[packet.routing_header.hop_index];
         self.packet_send
-            .get(next_hop)
+            .get(&next_hop)
             .unwrap()
-            .send(packet)
+            .send(packet.clone())
             .unwrap_or_else(|e| {
                 println!("Error sending packet: {}", e);
                 let nack_packet =
