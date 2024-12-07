@@ -1,12 +1,14 @@
 use crossbeam_channel::{select_biased, Receiver, Sender};
 use rand::Rng;
 use std::collections::HashMap;
-use std::fmt;
 use wg_2024::controller::DroneEvent::ControllerShortcut;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
+use wg_2024::packet::{self, FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
+
+#[cfg(feature = "modes" )]
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum FlyPathModes {
@@ -155,8 +157,7 @@ impl FlyPath {
         // in spicy modes here send another messages to the controller
     }
 
-    // TODO: implement handler
-    fn packet_handler(&mut self, mut packet: Packet) {
+    fn old_packet_handler(&mut self, mut packet: Packet) {
         // read Drone Protocol for the precise description of steps
 
         match &packet.pack_type {
@@ -212,13 +213,13 @@ impl FlyPath {
                             let mut rng = rand::thread_rng();
                             let random_number = rng.gen_range(0.0..1.0);
                             if random_number > self.pdr {
+                                self.packet_sender(packet.clone());
+                                self.controller_sender(DroneEvent::PacketSent(packet));
+                            }else{
                                 let nack_packet = self.nack_creator(&packet, NackType::Dropped);
                                 self.packet_sender(nack_packet.clone());
                                 self.controller_sender(DroneEvent::PacketDropped(packet.clone()));
                                 self.controller_sender(DroneEvent::PacketSent(nack_packet));
-                            } else {
-                                self.packet_sender(packet.clone());
-                                self.controller_sender(DroneEvent::PacketSent(packet));
                             }
                         }
                         _ => {
@@ -312,6 +313,143 @@ impl FlyPath {
                     .unwrap();
             });
     }
+
+
+    fn packet_handler(&mut self, mut packet: Packet) {
+        
+
+        if let PacketType::FloodRequest(req) = &packet.pack_type{
+            // TODO: floodrequest, WAITING FOR THE CORRECTION OF THE PROTOCOL
+            return
+        }
+
+        match self.validate_packet(&packet) {
+            Some(nack) => {
+                self.send_nack(&packet, nack);
+                return;
+            }
+            None => {}
+        }
+
+        if let PacketType::MsgFragment(_) = &packet.pack_type{
+            let should_drop_packet = self.pdr > rand::thread_rng().gen_range(0.0..1.0);
+            if should_drop_packet {
+                // Drop the fragment
+                self.send_nack(&packet, NackType::Dropped);
+                return;
+            }
+        }
+
+        // The packet is a `Nack`, `Ack`, `FloodResponse` or a non dropped `MsgFragment`
+        self.send_packet(&mut packet);
+
+        
+
+    }
+
+    // if is not valid packet returns the errors, possible NackType are:
+    // - UnexpectedRecipient
+    // - ErrorInRouting
+    // - DestinationIsDrone
+    fn validate_packet(&self, packet: &Packet) -> Option<NackType> {
+        // Packet forward to the wrong drone
+        if self.id != packet.routing_header.hops[packet.routing_header.hop_index] {
+            return Some(NackType::UnexpectedRecipient(self.id));
+        }
+
+        match packet.routing_header.next_hop() {
+            Some(next_hop) => {
+                if !self.packet_send.contains_key(&next_hop) {
+                    // Next hop is not a neighbour
+                    return Some(NackType::ErrorInRouting(
+                        packet.routing_header.hops[packet.routing_header.hop_index],
+                    ));
+                }
+            },
+            // No next hop
+            None => return Some(NackType::DestinationIsDrone)
+        }
+        // Valid Packet
+        None
+    }
+
+    // *Increment the hop_index* and if all is ok send message
+    // Send `Nack` if there is no next hop or next hop sender 
+    fn send_packet(&self, packet: &mut Packet){
+        packet.routing_header.increase_hop_index();
+        let next_hop : NodeId = packet.routing_header.hops[packet.routing_header.hop_index];
+
+        // Check if there's a sender for the next hop
+        if let Some(sender) = self.packet_send.get(&next_hop) {
+            // Attempt to send the packet
+            if sender.send(packet.clone()).is_err() {
+                // If sending fails, send a NACK indicating an error in routing, IS CORRECT ErrorInRouting?
+                // TODO: should we remove the sender from the list?
+                self.send_nack(&packet, NackType::ErrorInRouting(next_hop));
+            }else if let PacketType::MsgFragment(_) = packet.pack_type{
+                // Send `Ack` To `Client`/`Server` and `PacketSent` to `Controller` if the successfull is a MsgFragment
+                self.send_ack(packet);
+                self.send_event(DroneEvent::PacketSent(packet.clone()));
+            }
+            
+        } else {
+            // If no sender is found for the next hop, send a NACK
+            self.send_nack(&packet, NackType::ErrorInRouting(next_hop));
+        }
+    }
+
+    // Create and send a nack if the packet is a MsgFragment and send the event to `Controller` otherwise forward to Controller to send to destination
+    // Panic if controller is not reacheable
+    fn send_nack(&self, packet: &Packet, nack_type: NackType) {
+        match &packet.pack_type {
+            // FloodRequest can't enter in this function
+            PacketType::FloodRequest(_) => {}, 
+            PacketType::MsgFragment(fragment) => {
+
+                // Reverse route
+                let routing_header = SourceRoutingHeader::initialize(self.reverse_hops(packet));
+
+                let nack = Nack {
+                    fragment_index: fragment.fragment_index,
+                    nack_type,
+                };
+
+                // if there is a problem with the nack packet the `send_packet` function will call again `send_nack` but will forward to `Controller` cus packet is Nack
+                self.send_packet(&mut Packet::new_nack(routing_header, packet.session_id, nack));
+
+                // Send `PacketDropped` to `controller`
+                self.send_event(DroneEvent::PacketSent(packet.clone()));
+            },
+            _ => {
+                // If an error occurs on a FloodResponse, Ack, Nack send to the client/server throw ControllerShortcut
+                if let Err(e) = self.controller_send.send(DroneEvent::ControllerShortcut(packet.clone())) {
+                    // DOCUMENT THIS: Panic if no controller is listening or channel is dropped
+                    panic!("No controller listening or Channel dropped: {}", e);
+                }
+            }
+        }
+    }
+
+    fn send_ack(&self, packet: &Packet) {
+        let routing_header = SourceRoutingHeader::initialize(self.reverse_hops(packet));
+
+        let mut ack = Packet::new_ack(routing_header, packet.session_id, packet.get_fragment_index());
+        self.send_packet(&mut ack);
+    }
+
+    fn send_event(&self, event: DroneEvent) {
+        if self.controller_send.send(event).is_err() {
+            panic!("Controller is unreaceable");
+        }
+    }
+
+    fn reverse_hops(&self, packet: &Packet) -> Vec<NodeId>{
+        let mut reverse_hops = packet.routing_header.hops.clone();
+        reverse_hops.truncate(packet.routing_header.hop_index + 1 );
+        reverse_hops.reverse();
+        reverse_hops
+    }
+
 }
 
 #[cfg(test)]
@@ -320,6 +458,7 @@ mod tests {
     use super::*;
     use crossbeam_channel::unbounded;
     use wg_2024::packet::{Ack, Fragment};
+    use wg_2024::tests;
 
     // virtual connected drone's ID is 2.
     fn setup_test_drone(
@@ -352,29 +491,25 @@ mod tests {
         )
     }
 
-    // #[test]
-    // fn test_drone_crashed() {
-    //     let (drone, reciver_event, sender_command, reciver_packet, sender_packet) = setup_test_drone(0.0);
-    //     assert!(matches!(sender_command.send(DroneCommand::Crash), Ok(())));
-    // }
-
-    // #[test]
-    // fn test_add_sender() {
-    //     let (drone, reciver_event, sender_command, reciver_packet, sender_packet) = setup_test_drone(0.0);
-    //     let mut drone_pointer = Arc::new(drone);
-    //     let mut pointer_drone_clone = drone_pointer.clone();
-    //     let thred = thread::spawn(move || {pointer_drone_clone.run()});
-    //     let (s,r) = unbounded();
-    //     sender_command.send(DroneCommand::AddSender(3, s)).unwrap();
-    //     assert!(drone_pointer.check_conection(3));
-    // }
+    #[test]
+    fn test_generic_gragment_forward(){
+        tests::generic_fragment_forward::<FlyPath>();
+    }
 
     #[test]
-    fn test_drone_fragment_send(){
-        generic_fragment_forward::<FlyPath>();
-        generic_fragment_drop::<FlyPath>();
-        generic_chain_fragment_ack::<FlyPath>();
-        generic_chain_fragment_drop::<FlyPath>();
+    fn test_generic_fragment_drop(){
+        tests::generic_fragment_drop::<FlyPath>();
+    }
+
+
+    #[test]
+    fn test_chain_fragment_ack(){
+        tests::generic_chain_fragment_ack::<FlyPath>();
+    }
+    
+    #[test]
+    fn test_chain_fragment_drop(){
+        tests::generic_chain_fragment_drop::<FlyPath>();
     }
 
     fn create_sample_packet() -> Packet {
@@ -393,240 +528,4 @@ mod tests {
         }
     }
 
-    /// This function is used to test the packet forward functionality of a drone.
-    pub fn generic_fragment_forward<T: Drone + Send + 'static>() {
-        // drone 2 <Packet>
-        let (d_send, d_recv) = unbounded();
-        // drone 3 <Packet>
-        let (d2_send, d2_recv) = unbounded::<Packet>();
-        // SC commands
-        let (_d_command_send, d_command_recv) = unbounded();
-
-        let neighbours = HashMap::from([(12, d2_send.clone())]);
-        let mut drone = T::new(
-            11,
-            unbounded().0,
-            d_command_recv,
-            d_recv.clone(),
-            neighbours,
-            0.0,
-        );
-        // Spawn the drone's run method in a separate thread
-        thread::spawn(move || {
-            drone.run();
-        });
-
-        let mut msg = create_sample_packet();
-
-        // "Client" sends packet to d
-        d_send.send(msg.clone()).unwrap();
-        msg.routing_header.hop_index = 2;
-
-        // d2 receives packet from d1
-        assert_eq!(d2_recv.recv().unwrap(), msg);
-    }
-
-    /// Checks if the packet is dropped by one drone. The drone MUST have 100% packet drop rate, otherwise the test will fail sometimes.
-    pub fn generic_fragment_drop<T: Drone + Send + 'static>() {
-        // Client 1
-        let (c_send, c_recv) = unbounded();
-        // Drone 11
-        let (d_send, d_recv) = unbounded();
-        // SC commands
-        let (_d_command_send, d_command_recv) = unbounded();
-
-        let neighbours = HashMap::from([(12, d_send.clone()), (1, c_send.clone())]);
-        let mut drone = T::new(
-            11,
-            unbounded().0,
-            d_command_recv,
-            d_recv.clone(),
-            neighbours,
-            1.0,
-        );
-
-        // Spawn the drone's run method in a separate thread
-        thread::spawn(move || {
-            drone.run();
-        });
-
-        let msg = create_sample_packet();
-
-        // "Client" sends packet to the drone
-        d_send.send(msg.clone()).unwrap();
-
-        let dropped = Nack {
-            fragment_index: 1,
-            nack_type: NackType::Dropped,
-        };
-        let srh = SourceRoutingHeader {
-            hop_index: 1,
-            hops: vec![11, 1],
-        };
-        let nack_packet = Packet {
-            pack_type: PacketType::Nack(dropped),
-            routing_header: srh,
-            session_id: 1,
-        };
-
-        // Client listens for packet from the drone (Dropped Nack)
-        assert_eq!(c_recv.recv().unwrap(), nack_packet);
-    }
-
-    /// Checks if the packet is dropped by the second drone. The first drone must have 0% PDR and the second one 100% PDR, otherwise the test will fail sometimes.
-    pub fn generic_chain_fragment_drop<T: Drone + Send + 'static>() {
-        // Client 1 channels
-        let (c_send, c_recv) = unbounded();
-        // Server 21 channels
-        let (s_send, _s_recv) = unbounded();
-        // Drone 11
-        let (d_send, d_recv) = unbounded();
-        // Drone 12
-        let (d12_send, d12_recv) = unbounded();
-        // SC - needed to not make the drone crash
-        let (_d_command_send, d_command_recv) = unbounded();
-
-        // Drone 11
-        let neighbours11 = HashMap::from([(12, d12_send.clone()), (1, c_send.clone())]);
-        let mut drone = T::new(
-            11,
-            unbounded().0,
-            d_command_recv.clone(),
-            d_recv.clone(),
-            neighbours11,
-            0.0,
-        );
-        // Drone 12
-        let neighbours12 = HashMap::from([(11, d_send.clone()), (21, s_send.clone())]);
-        let mut drone2 = T::new(
-            12,
-            unbounded().0,
-            d_command_recv.clone(),
-            d12_recv.clone(),
-            neighbours12,
-            1.0,
-        );
-
-        // Spawn the drone's run method in a separate thread
-        thread::spawn(move || {
-            drone.run();
-        });
-
-        thread::spawn(move || {
-            drone2.run();
-        });
-
-        let msg = create_sample_packet();
-
-        // "Client" sends packet to the drone
-        d_send.send(msg.clone()).unwrap();
-
-        // Client receive an ACK originated from 'd'
-        assert_eq!(
-            c_recv.recv().unwrap(),
-            Packet {
-                pack_type: PacketType::Ack(Ack { fragment_index: 1 }),
-                routing_header: SourceRoutingHeader {
-                    hop_index: 1,
-                    hops: vec![11, 1],
-                },
-                session_id: 1,
-            }
-        );
-
-        // Client receive an NACK originated from 'd2'
-        assert_eq!(
-            c_recv.recv().unwrap(),
-            Packet {
-                pack_type: PacketType::Nack(Nack {
-                    fragment_index: 1,
-                    nack_type: NackType::Dropped,
-                }),
-                routing_header: SourceRoutingHeader {
-                    hop_index: 2,
-                    hops: vec![12, 11, 1],
-                },
-                session_id: 1,
-            }
-        );
-    }
-
-    /// Checks if the packet can reach its destination. Both drones must have 0% PDR, otherwise the test will fail sometimes.
-    pub fn generic_chain_fragment_ack<T: Drone + Send + 'static>() {
-        // Client<1> channels
-        let (c_send, c_recv) = unbounded();
-        // Server<21> channels
-        let (s_send, s_recv) = unbounded();
-        // Drone 11
-        let (d_send, d_recv) = unbounded();
-        // Drone 12
-        let (d12_send, d12_recv) = unbounded();
-        // SC - needed to not make the drone crash
-        let (_d_command_send, d_command_recv) = unbounded();
-
-        // Drone 11
-        let neighbours11 = HashMap::from([(12, d12_send.clone()), (1, c_send.clone())]);
-        let mut drone = T::new(
-            11,
-            unbounded().0,
-            d_command_recv.clone(),
-            d_recv.clone(),
-            neighbours11,
-            0.0,
-        );
-        // Drone 12
-        let neighbours12 = HashMap::from([(11, d_send.clone()), (21, s_send.clone())]);
-        let mut drone2 = T::new(
-            12,
-            unbounded().0,
-            d_command_recv.clone(),
-            d12_recv.clone(),
-            neighbours12,
-            0.0,
-        );
-
-        // Spawn the drone's run method in a separate thread
-        thread::spawn(move || {
-            drone.run();
-        });
-
-        thread::spawn(move || {
-            drone2.run();
-        });
-
-        let mut msg = create_sample_packet();
-
-        // "Client" sends packet to the drone
-        d_send.send(msg.clone()).unwrap();
-
-        // Client receive an ACK originated from 'd'
-        assert_eq!(
-            c_recv.recv().unwrap(),
-            Packet {
-                pack_type: PacketType::Ack(Ack { fragment_index: 1 }),
-                routing_header: SourceRoutingHeader {
-                    hop_index: 1,
-                    hops: vec![11, 1],
-                },
-                session_id: 1,
-            }
-        );
-
-        // Client receive an ACK originated from 'd2'
-        assert_eq!(
-            c_recv.recv().unwrap(),
-            Packet {
-                pack_type: PacketType::Ack(Ack { fragment_index: 1 }),
-                routing_header: SourceRoutingHeader {
-                    hop_index: 2,
-                    hops: vec![12, 11, 1],
-                },
-                session_id: 1,
-            }
-        );
-
-        msg.routing_header.hop_index = 3;
-        // Server receives the fragment
-        assert_eq!(s_recv.recv().unwrap(), msg);
-    }
 }
