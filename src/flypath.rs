@@ -1,13 +1,12 @@
 use crossbeam_channel::{select_biased, Receiver, Sender};
 use rand::Rng;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::mem::drop;
 use wg_2024::controller::DroneEvent::ControllerShortcut;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{
-    self, FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType,
-};
+use wg_2024::packet::{FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
 
 // TODO: crash
 // TODO: floodrequest
@@ -17,6 +16,8 @@ use wg_2024::packet::{
 
 #[cfg(feature = "modes")]
 use std::fmt;
+use std::process::exit;
+use wg_2024::packet::NackType::{Dropped, ErrorInRouting};
 
 #[derive(Debug, Clone)]
 pub enum FlyPathModes {
@@ -76,7 +77,7 @@ pub struct FlyPath {
     pub pdr: f32,
     // drone's mode, optional
     pub mode: FlyPathModes,
-    pub precFloodId: HashMap<u64, u64>,
+    pub precFloodId: HashSet<(u64, u8)>,
 }
 
 impl Drone for FlyPath {
@@ -96,7 +97,7 @@ impl Drone for FlyPath {
             packet_recv,
             packet_send,
             pdr,
-            precFloodId: HashMap::new(),
+            precFloodId: HashSet::new(),
         }
     }
 
@@ -106,7 +107,24 @@ impl Drone for FlyPath {
                 recv(self.controller_recv) -> cmd => {
                     if let Ok(cmd) = cmd {
                         if let DroneCommand::Crash = cmd{
-
+                            while let Ok(mut cmd) = self.packet_recv.try_recv() {
+                                match &cmd.pack_type{
+                                    PacketType::MsgFragment(_) => {
+                                        self.send_nack(&cmd, ErrorInRouting(self.id));
+                                    }
+                                    PacketType::Ack(_) => {
+                                        self.send_packet(& mut cmd);
+                                    }
+                                    PacketType::Nack(_) => {
+                                        self.send_packet(& mut cmd);
+                                    }
+                                    PacketType::FloodRequest(_) => {}
+                                    PacketType::FloodResponse(_) => {
+                                        self.send_packet(& mut cmd);
+                                    }
+                                }
+                            }
+                            break;
                         }
                         self.command_handler(cmd);
                     }
@@ -140,7 +158,7 @@ impl FlyPath {
             packet_recv,
             packet_send,
             pdr,
-            precFloodId: HashMap::new(),
+            precFloodId: HashSet::new(),
         }
     }
 
@@ -153,7 +171,15 @@ impl FlyPath {
                     println!("Drone {} added sender with {}", self.id, id);
                 }
             }
-            DroneCommand::RemoveSender(id) => {}
+            DroneCommand::RemoveSender(id) => {
+                drop(self.packet_send.remove(&id));
+                if self.packet_send.remove(&id).is_some() {
+                    println!("Drone {} removed sender with {}", self.id, id);
+                }
+                else{
+                    println!("Drone {} unable to remove sender with {}", self.id, id);
+                }
+            }
             DroneCommand::SetPacketDropRate(pdr) => {
                 self.pdr = pdr;
                 println!("Drone {} new pdr value: {}", self.id, self.pdr);
@@ -166,8 +192,29 @@ impl FlyPath {
 
     fn packet_handler(&mut self, mut packet: Packet) {
         if let PacketType::FloodRequest(req) = &packet.pack_type {
-            // TODO: floodrequest, WAITING FOR THE CORRECTION OF THE PROTOCOL
-            return;
+            // TODO: floodrequest, WAITING FOR THE CORRECTION OF THE OTHER GROUP MEMBER
+            let mut floodrequest = req.clone();
+            floodrequest.path_trace.push((self.id, NodeType::Drone));
+            if !self.precFloodId.contains(&(req.flood_id, req.initiator_id)) {
+
+                let mut no_neightbours = true;
+                self.precFloodId
+                    .insert((req.flood_id, req.initiator_id));
+                let new_packet = self.floodrequest_creator(&packet, &floodrequest);
+                for i in &self.packet_send {
+                    if *(i.0) != floodrequest.path_trace[req.path_trace.len() - 2].0 {
+                        self.send_floodrequest_packet(new_packet.clone(), i.0);
+                        no_neightbours = false;
+                    }
+                }
+                if !no_neightbours {
+                    let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
+                    self.send_packet(&mut floodresponse);
+                }
+            } else {
+                let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
+                self.send_packet(&mut floodresponse);
+            }
         }
 
         match self.validate_packet(&packet) {
@@ -217,6 +264,39 @@ impl FlyPath {
         None
     }
 
+    fn floodrequest_creator(&self, packet: &Packet, floodrequest: &FloodRequest) -> Packet {
+        Packet {
+            pack_type: PacketType::FloodRequest(floodrequest.clone()),
+            routing_header: SourceRoutingHeader {
+                hop_index: packet.routing_header.hop_index,
+                hops: packet.routing_header.hops.clone(),
+            },
+            session_id: packet.session_id,
+        }
+    }
+
+    fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet {
+        let mut reverse_hops = Vec::new();
+        for (i) in flood_request.path_trace {
+            reverse_hops.push(i.0);
+        }
+        reverse_hops.reverse();
+
+        let floodresponse = FloodResponse {
+            flood_id: flood_request.flood_id,
+            path_trace: flood_request.path_trace.clone(),
+        };
+
+        Packet {
+            pack_type: PacketType::FloodResponse(floodresponse),
+            routing_header: SourceRoutingHeader {
+                hop_index: 0,
+                hops: reverse_hops,
+            },
+            session_id: packet.session_id,
+        }
+    }
+
     // *Increment the hop_index* and if all is ok send message
     // Send `Nack` if there is no next hop or next hop sender
     fn send_packet(&mut self, packet: &mut Packet) {
@@ -237,6 +317,12 @@ impl FlyPath {
         } else {
             // If no sender is found for the next hop, send a NACK
             self.send_nack(&packet, NackType::ErrorInRouting(next_hop));
+        }
+    }
+
+    fn send_floodrequest_packet(&self, packet: Packet, node_id: &NodeId) {
+        if !self.packet_send.get(&node_id).unwrap().send(packet.clone()).is_err(){
+            self.send_event(DroneEvent::PacketSent(packet));
         }
     }
 
@@ -264,7 +350,9 @@ impl FlyPath {
 
                 // Send `PacketDropped` to `controller`
                 // self.send_event(DroneEvent::PacketSent(packet.clone()));
-                self.send_event(DroneEvent::PacketDropped(packet.clone()));
+                if nack_type == Dropped{
+                    self.send_event(DroneEvent::PacketDropped(packet.clone()));
+                }
             }
             _ => {
                 // If an error occurs on a FloodResponse, Ack, Nack send to the client/server throw ControllerShortcut
@@ -295,6 +383,7 @@ impl FlyPath {
 
 #[cfg(test)]
 mod tests {
+    use std::env::join_paths;
     use super::*;
     use crossbeam_channel::unbounded;
     use std::thread;
