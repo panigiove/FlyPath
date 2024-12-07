@@ -392,7 +392,6 @@ impl FlyPath {
                 self.send_nack(&packet, NackType::ErrorInRouting(next_hop));
             } else if let PacketType::MsgFragment(_) = packet.pack_type {
                 // Send `Ack` To `Client`/`Server` and `PacketSent` to `Controller` if the successfull is a MsgFragment
-                self.send_ack(packet);
                 self.send_event(DroneEvent::PacketSent(packet.clone()));
             }
         } else {
@@ -438,22 +437,6 @@ impl FlyPath {
                 }
             }
         }
-    }
-
-    fn send_ack(&self, packet: &Packet) {
-        let mut m_routing_header = packet.routing_header.clone();
-        m_routing_header.increase_hop_index();
-        let routing_header =
-            SourceRoutingHeader::new(self.reverse_hops(packet), m_routing_header.hop_index);
-        //QUI ERRORE in hop index
-        // let routing_header = SourceRoutingHeader::new(self.reverse_hops(packet),1);
-
-        let mut ack = Packet::new_ack(
-            routing_header,
-            packet.session_id,
-            packet.get_fragment_index(),
-        );
-        self.send_packet(&mut ack);
     }
 
     fn send_event(&self, event: DroneEvent) {
@@ -521,11 +504,13 @@ mod tests {
 
     #[test]
     fn test_chain_fragment_ack() {
+        //SBAGLIATO
         tests::generic_chain_fragment_ack::<FlyPath>();
     }
 
     #[test]
     fn test_chain_fragment_drop() {
+        //SBAGLIATO
         tests::generic_chain_fragment_drop::<FlyPath>();
     }
 
