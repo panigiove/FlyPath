@@ -310,11 +310,13 @@ mod tests {
         Sender<DroneCommand>,
         Receiver<Packet>,
         Sender<Packet>,
+        Receiver<Packet>,
     ) {
         let (drone_event_send, test_event_recv) = unbounded();
         let (test_command_send, drone_command_recv) = unbounded();
         let (test_packet_send, drone_packet_recv) = unbounded();
         let (drone_packet_send, test_packet_recv) = unbounded();
+        let (client_sender, client_reciver) = unbounded();
 
         (
             FlyPath::new(
@@ -322,24 +324,17 @@ mod tests {
                 drone_event_send,
                 drone_command_recv,
                 drone_packet_recv,
-                vec![(2, drone_packet_send)].into_iter().collect(),
+                vec![(2, drone_packet_send), (3, client_sender)]
+                    .into_iter()
+                    .collect(),
                 pdr,
             ),
             test_event_recv,
             test_command_send,
             test_packet_recv,
             test_packet_send,
+            client_reciver,
         )
-    }
-
-    #[test]
-    fn test_generic_gragment_forward() {
-        tests::generic_fragment_forward::<FlyPath>();
-    }
-
-    #[test]
-    fn test_generic_fragment_drop() {
-        tests::generic_fragment_drop::<FlyPath>();
     }
 
     fn create_sample_packet() -> Packet {
@@ -357,4 +352,129 @@ mod tests {
             session_id: 1,
         }
     }
+
+    #[test]
+    fn test_generic_gragment_forward() {
+        tests::generic_fragment_forward::<FlyPath>();
+    }
+
+    #[test]
+    fn test_generic_fragment_drop() {
+        tests::generic_fragment_drop::<FlyPath>();
+    }
+
+    //when hops[hop_index] doesen't mach the drone's own NodeId
+    #[test]
+    fn test_nack_unexpected_recipient() {
+        let (
+            mut drone,
+            test_event_recv,
+            test_command_send,
+            test_packet_recv,
+            test_packet_send,
+            client_reciver,
+        ) = setup_test_drone(0 as f32);
+        let packet = Packet {
+            pack_type: PacketType::MsgFragment(Fragment {
+                fragment_index: 1,
+                total_n_fragments: 1,
+                length: 128,
+                data: [1; 128],
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 1,
+                hops: vec![3, 2, 1],
+            },
+            session_id: 1,
+        };
+        drone.packet_handler(packet);
+        if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
+            assert_eq!(nack.nack_type, NackType::UnexpectedRecipient(drone.id));
+        }
+    }
+
+    //when drone is the final destination
+    #[test]
+    fn test_destination_is_drone() {
+        let (
+            mut drone,
+            test_event_recv,
+            test_command_send,
+            test_packet_recv,
+            test_packet_send,
+            client_reciver,
+        ) = setup_test_drone(0 as f32);
+        let packet = Packet {
+            pack_type: PacketType::MsgFragment(Fragment {
+                fragment_index: 1,
+                total_n_fragments: 1,
+                length: 128,
+                data: [1; 128],
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 1,
+                hops: vec![3, 1],
+            },
+            session_id: 1,
+        };
+        drone.packet_handler(packet);
+        if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
+            assert_eq!(nack.nack_type, NackType::DestinationIsDrone);
+        }
+    }
+
+    //when the next_hop is not a neighbor of the drone
+    #[test]
+    fn test_error_in_routing() {
+        let (
+            mut drone,
+            test_event_recv,
+            test_command_send,
+            test_packet_recv,
+            test_packet_send,
+            client_reciver,
+        ) = setup_test_drone(0 as f32);
+        let packet = Packet {
+            pack_type: PacketType::MsgFragment(Fragment {
+                fragment_index: 1,
+                total_n_fragments: 1,
+                length: 128,
+                data: [1; 128],
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 1,
+                hops: vec![3, 1, 4],
+            },
+            session_id: 1,
+        };
+        drone.packet_handler(packet);
+        if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
+            assert_eq!(nack.nack_type, NackType::ErrorInRouting(4));
+        }
+    }
+
+    //when a drone wants to send a message to a drone which is panicked
+    // #[test]
+    // fn test_forward_to_drone_panicked(){
+    //     let (mut drone,
+    //         test_event_recv,
+    //         test_command_send,
+    //         _test_packet_recv,
+    //         test_packet_send,
+    //         client_reciver) = setup_test_drone(0 as f32);
+    //     let packet = Packet {
+    //         pack_type: PacketType::MsgFragment(Fragment {
+    //             fragment_index: 1,
+    //             total_n_fragments: 1,
+    //             length: 128,
+    //             data: [1; 128],
+    //         }),
+    //         routing_header: SourceRoutingHeader {
+    //             hop_index: 1,
+    //             hops: vec![3, 1, 4],
+    //         },
+    //         session_id: 1,
+    //     };
+    //     drone.packet_handler(packet);
+    // }
 }
