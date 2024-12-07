@@ -187,7 +187,7 @@ impl Messages {
 /// # Examples
 /// ```rust
 /// // Assuming `event` is a valid FlyPath DroneEvent:
-/// if let Some((node_id, message)) = identify_flypath_event(&event) {
+/// if let Some((node_id, message)) = extract_flypath_message(&event) {
 ///     println!("FlyPath Event Detected! Node: {}, Message: {}", node_id, message);
 /// } else {
 ///     println!("This is not a FlyPath event.");
