@@ -543,27 +543,35 @@ mod tests {
     }
 
     //when a drone wants to send a message to a drone which is panicked
-    // #[test]
-    // fn test_forward_to_drone_panicked(){
-    //     let (mut drone,
-    //         test_event_recv,
-    //         test_command_send,
-    //         _test_packet_recv,
-    //         test_packet_send,
-    //         client_reciver) = setup_test_drone(0 as f32);
-    //     let packet = Packet {
-    //         pack_type: PacketType::MsgFragment(Fragment {
-    //             fragment_index: 1,
-    //             total_n_fragments: 1,
-    //             length: 128,
-    //             data: [1; 128],
-    //         }),
-    //         routing_header: SourceRoutingHeader {
-    //             hop_index: 1,
-    //             hops: vec![3, 1, 4],
-    //         },
-    //         session_id: 1,
-    //     };
-    //     drone.packet_handler(packet);
-    // }
+    //DA TESTARE
+    #[test]
+    fn test_forward_to_drone_panicked() {
+        let (mut drone,
+            test_event_recv,
+            test_command_send,
+            _test_packet_recv,
+            test_packet_send,
+            client_reciver) = setup_test_drone(0 as f32);
+        let packet = Packet {
+            pack_type: PacketType::MsgFragment(Fragment {
+                fragment_index: 1,
+                total_n_fragments: 1,
+                length: 128,
+                data: [1; 128],
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 1,
+                hops: vec![3, 1, 2],
+            },
+            session_id: 1,
+        };
+        drone.packet_handler(packet);
+        if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
+            assert_eq!(nack.nack_type, NackType::ErrorInRouting(2));
+        }
+    }
+
+    //TODO: test crash
+    //TODO: test di corretto invio di controller shorcut
+    //TODO: test per flooding
 }
