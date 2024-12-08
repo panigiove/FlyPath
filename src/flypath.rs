@@ -46,7 +46,7 @@ pub enum FlyPathThemes {
     // HarryPotter,
     // GerryScotty,
     // DarkSoulAndBloodborn,
-    // Pingu,
+    Pingu,
 }
 
 #[cfg(feature = "modes")]
@@ -59,7 +59,7 @@ impl fmt::Display for FlyPathThemes {
             // FlyPathThemes::HarryPotter => "HarryPotter",
             // FlyPathThemes::GerryScotty => "GerryScotty",
             // FlyPathThemes::DarkSoulAndBloodborne => "DarkSoulAndBloodborne",
-            // FlyPathThemes::Pingu => "Pingu",
+            FlyPathThemes::Pingu => "Pingu",
         };
         write!(f, "{}", theme_str)
     }
@@ -628,12 +628,14 @@ mod tests {
     //when a drone recives from the controller a DroneCommand Crash
     #[test]
     fn test_drone_command_crash() {
-        let (mut drone,
+        let (
+            mut drone,
             test_event_recv,
             test_command_send,
             test_packet_recv,
             test_packet_send,
-            client_reciver) = setup_test_drone(0 as f32);
+            client_reciver,
+        ) = setup_test_drone(0 as f32);
 
         let packet = Packet {
             pack_type: PacketType::MsgFragment(Fragment {
@@ -699,9 +701,7 @@ mod tests {
         };
 
         let ack_packet = Packet {
-            pack_type: PacketType::Ack( Ack {
-                fragment_index: 1,
-            }),
+            pack_type: PacketType::Ack(Ack { fragment_index: 1 }),
             routing_header: SourceRoutingHeader {
                 hop_index: 0,
                 hops: vec![1, 2],
@@ -750,7 +750,6 @@ mod tests {
         // Aspetta il termine del thread del drone
         handle.join().unwrap();
     }
-
 
     //TODO: test di corretto invio di controller shorcut
     //TODO: test per flooding

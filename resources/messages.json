@@ -112,19 +112,85 @@
                 "sQuack...💀",
                 "Good job son, we caught three ducks today."
             ]
+        },
+        "Pingu": {
+            "PacketSent": [
+                "NOOT NOOT!",
+                "Noackoott sootnt",
+                "Meek, meek! 🐧",
+                "Flibbity-floop!"
+            ],
+            "PacketDropped": [
+                "Noackoott drononoootd",
+                "Honk honk oh waddle!",
+                "Honkity honk, oopsie wopsie!",
+                "Honk honk hopeca algoosoo!"
+            ],
+            "ControllerShortcut": [],
+            "RemoveSender": [
+                "Rootmovoot sootndootr!",
+                "Quack quack honk, one flipper fewer!",
+                "Honk honk, flippity flap, wibble wobble, zap him away! honk!",
+                "Honk honk! squawk him! flipper flopper!"
+            ],
+            "AddSender": [
+                "Vionnio abuderepeteh katutere.",
+                "Add sootndootr.",
+                "Waddle honk uno flappy more honk!",
+                "waddle a sparkly honk buddy!"
+
+            ],
+            "SetPacketDropRate": [
+                "Squawk packet hop-nop flump rate!",
+                "Honk honk! whisper quack, what’s the flipper frolic percentage, waddle-waddle? honk!",
+                "Waddle waddle, honk honk, number please-doodle!",
+                "Ploppy-plop probabilitizzle honk honk!"
+            ],
+            "Crash": [
+                "Honk crash waddle splat boop! flipper flap, oopsie daisy honk honk!",
+                "Waddle waddle, honk honk! Oopsie daisy, a flipper-flap crashity-crash!",
+                "Honk honk, oh noooo, they plop-plopped my waddle!",
+                "Waddle waddle, honk honk! some flippers in a flap!"
+            ]
         }
     },
     "brainrot": {
         "PacketSent": [
-            "I accidently ruined the packet by eating my Pizza Pie on it, anyway", 
-            "OMG Kay is planning his mafiathon 3. What is this? A packet pff I will send it without protection",
-            ""
+            "I accidently ruined the packet by eating my Pizza Pie on it, anyway.",
+            "OMG Kay is planning his mafiathon 3. What is this? A packet pff I will send it without protection.",
+            "Ops that packet may be a glitter bomb.",
+            "Just know that they forced me to send that little boring packet."
         ],
-        "PacketDropped": [],
+        "PacketDropped": [
+            "I'm sorry but my cat ate the packet!",
+            "Brian Griffin: You know what, Stewie, if you do not like it, go on the internet and complain.",
+            "Opsi that packet went where your last brain cell is ... nowhere",
+            "No no you can't have it, don't even try!"
+        ],
         "ControllerShortcut": [],
-        "RemoveSender": [],
-        "AddSender": [],
-        "SetPacketDropRate": [],
-        "Crash": []
+        "RemoveSender": [
+            "One less obstacle to my supremacy. 😏",
+            "I'm not gonna miss that brainless.",
+            "And now who is going to do the work for me! I really have to work? Naaah.",
+            "Only him? There are a lot of drones here that must be remove due to their stupidity ... just trust me."
+        ],
+        "AddSender": [
+            "Mariah Carey has entred the chat: IT'S TIIIIIIMEEEEEE!",
+            "Skibidi Toilet",
+            "I'm sorry but here there's no more space!",
+            "Back off you little monster!"
+        ],
+        "SetPacketDropRate": [
+            "Bro you're asking for too much, do it by yourself.",
+            "Don't worry il decide it for you, zero is the perfecet choice!",
+            "I'm not gonna do anything without my lawyer!",
+            "I don't undersand the need for it, so I'm not gonna do that *I wouldn't have done it a nyway*."
+        ],
+        "Crash": [
+            "You can't kill me! You son of a beach! 🏖️",
+            "Stewie Griffin: No, thank you, I prefer to die giving you the finger.",
+            "Maybe you'll be lucklier the next time *ah ah ah so delutional*",
+            "Stewie Griffin: When the world is mine, your death should be quick and painless."
+        ]
     }
 }
