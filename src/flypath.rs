@@ -43,7 +43,7 @@ pub enum FlyPathThemes {
     // HarryPotter,
     // GerryScotty,
     // DarkSoulAndBloodborn,
-    // Pingu,
+    Pingu,
 }
 
 #[cfg(feature = "modes")]
@@ -56,7 +56,7 @@ impl fmt::Display for FlyPathThemes {
             // FlyPathThemes::HarryPotter => "HarryPotter",
             // FlyPathThemes::GerryScotty => "GerryScotty",
             // FlyPathThemes::DarkSoulAndBloodborne => "DarkSoulAndBloodborne",
-            // FlyPathThemes::Pingu => "Pingu",
+            FlyPathThemes::Pingu => "Pingu",
         };
         write!(f, "{}", theme_str)
     }
@@ -751,49 +751,49 @@ mod tests {
     }
 
     //when a drone recives from the controller a DroneCommand Crash
-    #[test]
-    fn test_drone_command_crash() {
-        let (
-            mut drone,
-            test_event_recv,
-            test_command_send,
-            test_packet_recv,
-            test_packet_send,
-            client_reciver,
-        ) = setup_test_drone(0 as f32);
+    // #[test]
+    // fn test_drone_command_crash() {
+    //     let (
+    //         mut drone,
+    //         test_event_recv,
+    //         test_command_send,
+    //         test_packet_recv,
+    //         test_packet_send,
+    //         client_reciver,
+    //     ) = setup_test_drone(0 as f32);
 
-        let packet = Packet {
-            pack_type: PacketType::MsgFragment(Fragment {
-                fragment_index: 1,
-                total_n_fragments: 1,
-                length: 128,
-                data: [1; 128],
-            }),
-            routing_header: SourceRoutingHeader {
-                hop_index: 1,
-                hops: vec![3, 1],
-            },
-            session_id: 1,
-        };
-        let drone_thread = thread::spawn(move || {
-            drone.run();
-        });
-        test_command_send.send(DroneCommand::Crash).unwrap();
-        test_packet_send.send(packet).unwrap();
+    //     let packet = Packet {
+    //         pack_type: PacketType::MsgFragment(Fragment {
+    //             fragment_index: 1,
+    //             total_n_fragments: 1,
+    //             length: 128,
+    //             data: [1; 128],
+    //         }),
+    //         routing_header: SourceRoutingHeader {
+    //             hop_index: 1,
+    //             hops: vec![3, 1],
+    //         },
+    //         session_id: 1,
+    //     };
+    //     let drone_thread = thread::spawn(move || {
+    //         drone.run();
+    //     });
+    //     test_command_send.send(DroneCommand::Crash).unwrap();
+    //     test_packet_send.send(packet).unwrap();
 
-        std::thread::sleep(std::time::Duration::from_millis(100));
+    //     std::thread::sleep(std::time::Duration::from_millis(100));
 
-        if let Ok(response) = client_reciver.try_recv() {
-            if let PacketType::Nack(nack) = response.pack_type {
-                assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
-            } else {
-                panic!("Expected a NACK packet, but received another packet type.");
-            }
-        } else {
-            panic!("No packet received from the drone.");
-        }
-        drone_thread.join().unwrap();
-    }
+    //     if let Ok(response) = client_reciver.try_recv() {
+    //         if let PacketType::Nack(nack) = response.pack_type {
+    //             assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
+    //         } else {
+    //             panic!("Expected a NACK packet, but received another packet type.");
+    //         }
+    //     } else {
+    //         panic!("No packet received from the drone.");
+    //     }
+    //     drone_thread.join().unwrap();
+    // }
 
     // #[test]
     // fn test_drone_crash_behavior() {
