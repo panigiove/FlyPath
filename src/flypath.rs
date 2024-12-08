@@ -191,31 +191,31 @@ impl FlyPath {
     }
 
     fn packet_handler(&mut self, mut packet: Packet) {
-        if let PacketType::FloodRequest(req) = &packet.pack_type {
-            // TODO: floodrequest, WAITING FOR THE CORRECTION OF THE OTHER GROUP MEMBER
-            let mut floodrequest = req.clone();
-            floodrequest.path_trace.push((self.id, NodeType::Drone));
-            if !self.precFloodId.contains(&(req.flood_id, req.initiator_id)) {
-
-                let mut no_neightbours = true;
-                self.precFloodId
-                    .insert((req.flood_id, req.initiator_id));
-                let new_packet = self.floodrequest_creator(&packet, &floodrequest);
-                for i in &self.packet_send {
-                    if *(i.0) != floodrequest.path_trace[req.path_trace.len() - 2].0 {
-                        self.send_floodrequest_packet(new_packet.clone(), i.0);
-                        no_neightbours = false;
-                    }
-                }
-                if !no_neightbours {
-                    let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
-                    self.send_packet(&mut floodresponse);
-                }
-            } else {
-                let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
-                self.send_packet(&mut floodresponse);
-            }
-        }
+        // if let PacketType::FloodRequest(req) = &packet.pack_type {
+        //     // TODO: floodrequest, WAITING FOR THE CORRECTION OF THE OTHER GROUP MEMBER
+        //     let mut floodrequest = req.clone();
+        //     floodrequest.path_trace.push((self.id, NodeType::Drone));
+        //     if !self.precFloodId.contains(&(req.flood_id, req.initiator_id)) {
+        //
+        //         let mut no_neightbours = true;
+        //         self.precFloodId
+        //             .insert((req.flood_id, req.initiator_id));
+        //         let new_packet = self.floodrequest_creator(&packet, &floodrequest);
+        //         for i in &self.packet_send {
+        //             if *(i.0) != floodrequest.path_trace[req.path_trace.len() - 2].0 {
+        //                 self.send_floodrequest_packet(new_packet.clone(), i.0);
+        //                 no_neightbours = false;
+        //             }
+        //         }
+        //         if !no_neightbours {
+        //             let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
+        //             self.send_packet(&mut floodresponse);
+        //         }
+        //     } else {
+        //         let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
+        //         self.send_packet(&mut floodresponse);
+        //     }
+        // }
 
         match self.validate_packet(&packet) {
             Some(nack) => {
@@ -275,27 +275,27 @@ impl FlyPath {
         }
     }
 
-    fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet {
-        let mut reverse_hops = Vec::new();
-        for (i) in flood_request.path_trace {
-            reverse_hops.push(i.0);
-        }
-        reverse_hops.reverse();
-
-        let floodresponse = FloodResponse {
-            flood_id: flood_request.flood_id,
-            path_trace: flood_request.path_trace.clone(),
-        };
-
-        Packet {
-            pack_type: PacketType::FloodResponse(floodresponse),
-            routing_header: SourceRoutingHeader {
-                hop_index: 0,
-                hops: reverse_hops,
-            },
-            session_id: packet.session_id,
-        }
-    }
+    // fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet {
+    //     let mut reverse_hops = Vec::new();
+    //     for (i) in flood_request.path_trace {
+    //         reverse_hops.push(i.0);
+    //     }
+    //     reverse_hops.reverse();
+    //
+    //     let floodresponse = FloodResponse {
+    //         flood_id: flood_request.flood_id,
+    //         path_trace: flood_request.path_trace.clone(),
+    //     };
+    //
+    //     Packet {
+    //         pack_type: PacketType::FloodResponse(floodresponse),
+    //         routing_header: SourceRoutingHeader {
+    //             hop_index: 0,
+    //             hops: reverse_hops,
+    //         },
+    //         session_id: packet.session_id,
+    //     }
+    // }
 
     // *Increment the hop_index* and if all is ok send message
     // Send `Nack` if there is no next hop or next hop sender
@@ -571,7 +571,49 @@ mod tests {
         }
     }
 
-    //TODO: test crash
+
+    //when a drone recives from the controller a DroneCommand Crash
+    #[test]
+    fn test_drone_command_crash() {
+        let (mut drone,
+            test_event_recv,
+            test_command_send,
+            test_packet_recv,
+            test_packet_send,
+            client_reciver) = setup_test_drone(0 as f32);
+
+        let packet = Packet {
+            pack_type: PacketType::MsgFragment(Fragment {
+                fragment_index: 1,
+                total_n_fragments: 1,
+                length: 128,
+                data: [1; 128],
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 1,
+                hops: vec![3, 1],
+            },
+            session_id: 1,
+        };
+        let drone_thread = thread::spawn(move || {
+            drone.run();
+        });
+        test_command_send.send(DroneCommand::Crash).unwrap();
+        test_packet_send.send(packet).unwrap();
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+
+        if let Ok(response) = client_reciver.try_recv() {
+            if let PacketType::Nack(nack) = response.pack_type {
+                assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
+            } else {
+                panic!("Expected a NACK packet, but received another packet type.");
+            }
+        } else {
+            panic!("No packet received from the drone.");
+        }
+        drone_thread.join().unwrap();
+    }
     //TODO: test di corretto invio di controller shorcut
     //TODO: test per flooding
 }
