@@ -277,7 +277,7 @@ impl FlyPath {
 
     fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet {
         let mut reverse_hops = Vec::new();
-        for (i) in flood_request.path_trace {
+        for (i) in &flood_request.path_trace {
             reverse_hops.push(i.0);
         }
         reverse_hops.reverse();
