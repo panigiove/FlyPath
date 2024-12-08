@@ -152,6 +152,100 @@
                 "Honk honk, oh noooo, they plop-plopped my waddle!",
                 "Waddle waddle, honk honk! some flippers in a flap!"
             ]
+        },
+        "Dark Souls": {
+            "PacketSent": [
+                "Victory achieved!!",
+                "Heir of Fire defeated!!"
+            ],
+            "PacketDropped": [
+                "You hava been fooled by Patches!",
+                "Oh no, my precious souls..."
+            ],
+            "ControllerShortcut": [],
+            "RemoveSender": [
+                "FRIGOBAR has died",
+                "Phalanx has died",
+                "Knight Solaire has died"
+            ],
+            "AddSender": [
+                "Praise the suuuuuuuuun!!",
+                "You summoned FRIGOBAR in your world",
+                "You summoned Phalanx in your world"
+            ],
+            "SetPacketDropRate": [
+                "Pray thee be careful, neither of us want to see you go Hollow"
+            ],
+            "Crash": [
+                "You Died!",
+                "Plin Plon Plon..."
+            ]
+        },
+        "Bloodborne": {
+            "PacketSent": [
+                "PRAY SLAUGHTERED",
+                "NIGHTMARE SLAIN"
+            ],
+            "PacketDropped": [
+                "Oh no my blood echoes...",
+                "Oh Amygdala, oh Amygdala... Have mercy on the poor bastard..."
+            ],
+            "ControllerShortcut": [],
+            "RemoveSender": [
+                "Master Willem, I've come to bid you farewell",
+                "A sinister bell resonate",
+                "Master, look! I've done it, I've done it! I smashed and pounded and grounded this rotten siren into fleshy pink pulp!"
+            ],
+            "AddSender": [
+                "Welcome to the Hunter's Dream",
+                "Welcome home, Good Hunter. What is it you desire?",
+                "A hoonter must hoont",
+                "Oh, beg pardon, you may call me Alfred. Why not cooperate, and discuss the things we've learned?"
+            ],
+            "SetPacketDropRate": [
+                "Our Eyes are yet to open. Fear the old blood",
+                "By the gods, fear it, Laurence..",
+                "WREEEIIAAAAIIIAAAAAHHH",
+                "O Flora, of the moon, of the dream. Let the hunter be safe and find comfort"
+            ],
+            "Crash": [
+                "The Night, and the Dream, were long...",
+                "OHHH NOOOO, I'm waking up... I'll forget everything...",
+                "Farewell my keen Hunter, fear the blood",
+                "Tonight, Gehrman joins the Hunt",
+                "YOU DIED!"
+            ]
+        },
+        "Harry Potter": {
+            "PacketSent": [
+                "Hedwige has departed to deliver a message!",
+                "An Owl has departed to deliver a message"
+            ],
+            "PacketDropped": [
+                "NOOOO EDWIGE!",
+                "A Death Eater has slaughtered the owl!"
+            ],
+            "ControllerShortcut": [],
+            "RemoveSender": [
+                "You have been expelled from Hogwarts!!",
+                "Why is it, when something happens, it is always you three?"
+            ],
+            "AddSender": [
+                "Welcome to Hogwarts, you will soon be sorted into one of the houses!!",
+                "The Sorting ceremony will begin soon!!",
+                "Gryffindor!!",
+                "HufflePuff!!",
+                "Ravenclaw!!",
+                "Slytherin!!"
+            ],
+            "SetPacketDropRate": [
+                "Oh, honestly, this school has gone to the dogs! Balderdash! Poppycock! A babbling, bumbling band of baboons!"
+            ],
+            "Crash": [
+                "Avada Kedavra!!",
+                "Pietrificus Totalus!!",
+                "Stupeficium!!"
+            ]
         }
     },
     "brainrot": {

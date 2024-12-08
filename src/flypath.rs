@@ -5,8 +5,9 @@ use wg_2024::controller::DroneEvent::ControllerShortcut;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::NackType::{Dropped, ErrorInRouting};
-use wg_2024::packet::{self, Nack, NackType, NodeType, Packet, PacketType};
+use wg_2024::packet::{
+    FloodRequest, Nack, NackType, NodeType, Packet, PacketType,
+};
 
 // TODO: crash
 // TODO: floodrequest
@@ -18,6 +19,7 @@ use wg_2024::packet::{self, Nack, NackType, NodeType, Packet, PacketType};
 use crate::messages::{self, Messages};
 #[cfg(feature = "modes")]
 use std::fmt;
+use wg_2024::packet::NackType::{Dropped, ErrorInRouting};
 
 #[derive(Debug, Clone)]
 pub enum FlyPathModes {
@@ -40,9 +42,10 @@ pub enum FlyPathThemes {
     Batman,
     Rocket,
     Quackable,
-    // HarryPotter,
+    HarryPotter,
     // GerryScotty,
-    // DarkSoulAndBloodborn,
+    DarkSouls,
+    Bloodborne,
     Pingu,
 }
 
@@ -53,9 +56,10 @@ impl fmt::Display for FlyPathThemes {
             FlyPathThemes::Batman => "Batman",
             FlyPathThemes::Rocket => "Rocket",
             FlyPathThemes::Quackable => "Quackable",
-            // FlyPathThemes::HarryPotter => "HarryPotter",
+            FlyPathThemes::HarryPotter => "HarryPotter",
             // FlyPathThemes::GerryScotty => "GerryScotty",
-            // FlyPathThemes::DarkSoulAndBloodborne => "DarkSoulAndBloodborne",
+            FlyPathThemes::DarkSouls => "DarkSoul",
+            FlyPathThemes::Bloodborne => "Bloodborne",
             FlyPathThemes::Pingu => "Pingu",
         };
         write!(f, "{}", theme_str)
@@ -69,7 +73,7 @@ pub struct FlyPath {
     pub id: NodeId,
     // send to controller the DroneEvent
     pub controller_send: Sender<DroneEvent>,
-    // receive from the controleller a command
+    // receive from the controller a command
     pub controller_recv: Receiver<DroneCommand>,
     // receive a packet from a connected drone
     pub packet_recv: Receiver<Packet>,
@@ -117,7 +121,7 @@ impl Drone for FlyPath {
                             DroneCommand::Crash => {
                                 #[cfg(not(feature = "modes"))]
                                 {
-                                    self.gentle_crash(); 
+                                    self.gentle_crash();
                                     break;
                                 }
 
@@ -130,7 +134,7 @@ impl Drone for FlyPath {
                                     );
                                     match &self.mode {
                                         FlyPathModes::Default => {
-                                            self.gentle_crash(); 
+                                            self.gentle_crash();
                                             break;
                                         }
                                         FlyPathModes::Spicy(_) => {
@@ -253,7 +257,7 @@ impl FlyPath {
                 {
                     self.pdr = pdr;
                 }
-                
+
                 #[cfg(feature = "modes")]
                 match &self.mode {
                     FlyPathModes::Default => {
@@ -266,7 +270,7 @@ impl FlyPath {
                         }
                     }
                     FlyPathModes::BrainRot => {}
-                }                
+                }
             }
             _ => {}
         }
@@ -477,14 +481,11 @@ impl FlyPath {
 
 #[cfg(test)]
 mod tests {
-    use core::time;
-    use std::result;
-    use std::thread::{self, sleep};
+    use std::thread::{self};
 
     use super::*;
     use crossbeam_channel::unbounded;
-    use packet::FloodRequest;
-    use wg_2024::packet::{Ack, Fragment};
+    use wg_2024::packet::{Ack, Fragment, FloodRequest};
     use wg_2024::tests;
 
     // virtual connected drone's ID is 2.
@@ -751,115 +752,114 @@ mod tests {
     }
 
     //when a drone recives from the controller a DroneCommand Crash
-    // #[test]
-    // fn test_drone_command_crash() {
-    //     let (
-    //         mut drone,
-    //         test_event_recv,
-    //         test_command_send,
-    //         test_packet_recv,
-    //         test_packet_send,
-    //         client_reciver,
-    //     ) = setup_test_drone(0 as f32);
+     #[test]
+     fn test_drone_command_crash() {
+         let (
+             mut drone,
+             test_event_recv,
+             test_command_send,
+             test_packet_recv,
+             test_packet_send,
+             client_reciver,
+         ) = setup_test_drone(0 as f32);
+        let packet = Packet {
+           pack_type: PacketType::MsgFragment(Fragment {
+                 fragment_index: 1,
+                 total_n_fragments: 1,
+                 length: 128,
+                 data: [1; 128],
+             }),
+             routing_header: SourceRoutingHeader {
+                 hop_index: 1,
+                 hops: vec![3, 1],
+             },
+             session_id: 1,
+         };
+         let drone_thread = thread::spawn(move || {
+             drone.run();
+         });
+         test_command_send.send(DroneCommand::Crash).unwrap();
+         test_packet_send.send(packet).unwrap();
 
-    //     let packet = Packet {
-    //         pack_type: PacketType::MsgFragment(Fragment {
-    //             fragment_index: 1,
-    //             total_n_fragments: 1,
-    //             length: 128,
-    //             data: [1; 128],
-    //         }),
-    //         routing_header: SourceRoutingHeader {
-    //             hop_index: 1,
-    //             hops: vec![3, 1],
-    //         },
-    //         session_id: 1,
-    //     };
-    //     let drone_thread = thread::spawn(move || {
-    //         drone.run();
-    //     });
-    //     test_command_send.send(DroneCommand::Crash).unwrap();
-    //     test_packet_send.send(packet).unwrap();
+         std::thread::sleep(std::time::Duration::from_millis(100));
 
-    //     std::thread::sleep(std::time::Duration::from_millis(100));
+         if let Ok(response) = client_reciver.try_recv() {
+             if let PacketType::Nack(nack) = response.pack_type {
+                 assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
+             } else {
+                 panic!("Expected a NACK packet, but received another packet type.");
+             }
+         } else {
+             panic!("No packet received from the drone.");
+         }
+         drone_thread.join().unwrap();
+     }
 
-    //     if let Ok(response) = client_reciver.try_recv() {
-    //         if let PacketType::Nack(nack) = response.pack_type {
-    //             assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
-    //         } else {
-    //             panic!("Expected a NACK packet, but received another packet type.");
-    //         }
-    //     } else {
-    //         panic!("No packet received from the drone.");
-    //     }
-    //     drone_thread.join().unwrap();
-    // }
+    #[test]
+    fn test_drone_crash_behavior() {
+         use std::thread;
+         use std::time::Duration;
 
-    // #[test]
-    // fn test_drone_crash_behavior() {
-    //     use std::thread;
-    //     use std::time::Duration;
+         // Imposta un drone di test con canali di comunicazione
+         let (
+             mut drone,
+             test_event_recv,
+             test_command_send,
+             test_packet_recv,
+             test_packet_send,
+             client_reciver,
+         ) = setup_test_drone(0.0); // Nessuna probabilità di perdita per testare solo la logica del crash
 
-    //     // Imposta un drone di test con canali di comunicazione
-    //     let (
-    //         mut drone,
-    //         test_event_recv,
-    //         test_command_send,
-    //         test_packet_recv,
-    //         test_packet_send,
-    //         client_reciver,
-    //     ) = setup_test_drone(0.0); // Nessuna probabilità di perdita per testare solo la logica del crash
+         // Invia pacchetti alla coda del drone
+         let flood_request_packet = Packet {
+             pack_type: PacketType::FloodRequest(FloodRequest {
+                 flood_id: 1,
+                 initiator_id: 3,
+                 path_trace: vec![(3, NodeType::Client)],
+             }),
+             routing_header: SourceRoutingHeader {
+                 hop_index: 0,
+                 hops: Vec::new(),
+             },
+             session_id: 1,
+         };
 
-    //     // Invia pacchetti alla coda del drone
-    //     let flood_request_packet = Packet {
-    //         pack_type: PacketType::FloodRequest(FloodRequest {
-    //             flood_id: 1,
-    //             initiator_id: 3,
-    //             path_trace: vec![(3, NodeType::Client)],
-    //         }),
-    //         routing_header: SourceRoutingHeader {
-    //             hop_index: 0,
-    //             hops: Vec::new(),
-    //         },
-    //         session_id: 1,
-    //     };
+         let ack_packet = Packet {
+             pack_type: PacketType::Ack(Ack { fragment_index: 1 }),
+             routing_header: SourceRoutingHeader {
+                 hop_index: 1,
+                 hops: vec![2, 1, 3],
+             },
+             session_id: 2,
+         };
 
-    //     let ack_packet = Packet {
-    //         pack_type: PacketType::Ack(Ack { fragment_index: 1 }),
-    //         routing_header: SourceRoutingHeader {
-    //             hop_index: 1,
-    //             hops: vec![2, 1, 3],
-    //         },
-    //         session_id: 2,
-    //     };
+         // Invia il comando di crash
+         test_command_send.send(DroneCommand::Crash).unwrap();
 
-    //     // Invia il comando di crash
-    //     test_command_send.send(DroneCommand::Crash).unwrap();
+         // Invia pacchetti al drone
+         test_packet_send.send(flood_request_packet).unwrap();
+         test_packet_send.send(ack_packet.clone()).unwrap();
 
-    //     // Invia pacchetti al drone
-    //     test_packet_send.send(flood_request_packet).unwrap();
-    //     test_packet_send.send(ack_packet.clone()).unwrap();
-        
 
-    //     // Avvia il drone in un thread separato
-    //     let handle = thread::spawn(move || drone.run());
+         // Avvia il drone in un thread separato
+         let handle = thread::spawn(move || drone.run());
 
-    //     // Attendi per dare tempo al drone di processare i pacchetti
-    //     thread::sleep(Duration::from_secs(1));
+         // Attendi per dare tempo al drone di processare i pacchetti
+         thread::sleep(Duration::from_secs(1));
 
-    //     // Controlla che i pacchetti siano stati gestiti correttamente
-    //     // Ack e Nack (dall'invalid_packet) dovrebbero essere stati inoltrati
-    //     if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
-    //         assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
-    //     }
+         // Controlla che i pacchetti siano stati gestiti correttamente
+         // Ack e Nack (dall'invalid_packet) dovrebbero essere stati inoltrati
+         if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
+             assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
+         }
 
-    //     // Verifica che lo stato di crash abbia svuotato i messaggi
-    //     assert!(test_event_recv.is_empty());
-    //     assert!(test_packet_recv.is_empty());
+         // Verifica che lo stato di crash abbia svuotato i messaggi
+         assert!(test_event_recv.is_empty());
+         assert!(test_packet_recv.is_empty());
 
-    //     // Aspetta il termine del thread del drone
-    //     handle.join().unwrap();
-    // }
+         // Aspetta il termine del thread del drone
+         handle.join().unwrap();
+     }
 
     //TODO: test di corretto invio di controller shorcut
     //TODO: test per flooding
