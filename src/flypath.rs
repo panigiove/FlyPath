@@ -191,31 +191,31 @@ impl FlyPath {
     }
 
     fn packet_handler(&mut self, mut packet: Packet) {
-        // if let PacketType::FloodRequest(req) = &packet.pack_type {
-        //     // TODO: floodrequest, WAITING FOR THE CORRECTION OF THE OTHER GROUP MEMBER
-        //     let mut floodrequest = req.clone();
-        //     floodrequest.path_trace.push((self.id, NodeType::Drone));
-        //     if !self.precFloodId.contains(&(req.flood_id, req.initiator_id)) {
-        //
-        //         let mut no_neightbours = true;
-        //         self.precFloodId
-        //             .insert((req.flood_id, req.initiator_id));
-        //         let new_packet = self.floodrequest_creator(&packet, &floodrequest);
-        //         for i in &self.packet_send {
-        //             if *(i.0) != floodrequest.path_trace[req.path_trace.len() - 2].0 {
-        //                 self.send_floodrequest_packet(new_packet.clone(), i.0);
-        //                 no_neightbours = false;
-        //             }
-        //         }
-        //         if !no_neightbours {
-        //             let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
-        //             self.send_packet(&mut floodresponse);
-        //         }
-        //     } else {
-        //         let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
-        //         self.send_packet(&mut floodresponse);
-        //     }
-        // }
+        if let PacketType::FloodRequest(req) = &packet.pack_type {
+            // TODO: floodrequest, WAITING FOR THE CORRECTION OF THE OTHER GROUP MEMBER
+            let mut floodrequest = req.clone();
+            floodrequest.path_trace.push((self.id, NodeType::Drone));
+            if !self.precFloodId.contains(&(req.flood_id, req.initiator_id)) {
+
+                let mut no_neightbours = true;
+                self.precFloodId
+                    .insert((req.flood_id, req.initiator_id));
+                let new_packet = self.floodrequest_creator(&packet, &floodrequest);
+                for i in &self.packet_send {
+                    if *(i.0) != floodrequest.path_trace[req.path_trace.len() - 2].0 {
+                        self.send_floodrequest_packet(new_packet.clone(), i.0);
+                        no_neightbours = false;
+                    }
+                }
+                if !no_neightbours {
+                    let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
+                    self.send_packet(&mut floodresponse);
+                }
+            } else {
+                let mut floodresponse = self.floodresponse_creator(&packet, &floodrequest);
+                self.send_packet(&mut floodresponse);
+            }
+        }
 
         match self.validate_packet(&packet) {
             Some(nack) => {
@@ -275,27 +275,27 @@ impl FlyPath {
         }
     }
 
-    // fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet {
-    //     let mut reverse_hops = Vec::new();
-    //     for (i) in flood_request.path_trace {
-    //         reverse_hops.push(i.0);
-    //     }
-    //     reverse_hops.reverse();
-    //
-    //     let floodresponse = FloodResponse {
-    //         flood_id: flood_request.flood_id,
-    //         path_trace: flood_request.path_trace.clone(),
-    //     };
-    //
-    //     Packet {
-    //         pack_type: PacketType::FloodResponse(floodresponse),
-    //         routing_header: SourceRoutingHeader {
-    //             hop_index: 0,
-    //             hops: reverse_hops,
-    //         },
-    //         session_id: packet.session_id,
-    //     }
-    // }
+    fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet {
+        let mut reverse_hops = Vec::new();
+        for (i) in flood_request.path_trace {
+            reverse_hops.push(i.0);
+        }
+        reverse_hops.reverse();
+
+        let floodresponse = FloodResponse {
+            flood_id: flood_request.flood_id,
+            path_trace: flood_request.path_trace.clone(),
+        };
+
+        Packet {
+            pack_type: PacketType::FloodResponse(floodresponse),
+            routing_header: SourceRoutingHeader {
+                hop_index: 0,
+                hops: reverse_hops,
+            },
+            session_id: packet.session_id,
+        }
+    }
 
     // *Increment the hop_index* and if all is ok send message
     // Send `Nack` if there is no next hop or next hop sender
