@@ -700,6 +700,7 @@ mod tests {
         }
     }
 
+    //checks if the drone sends correctly the FloodRequest
     #[test]
     fn test_FloodRequest_send_to_neighbour() {
         let (
@@ -730,6 +731,7 @@ mod tests {
         }
     }
 
+    //checks if the response is sent correctly
     #[test]
     fn test_FloodResponse() {
         let (mut drone, test_event_recv, test_command_send, test_packet_send, client_reciver) =
@@ -750,7 +752,7 @@ mod tests {
         }
     }
 
-    //when a drone recives from the controller a DroneCommand Crash
+    //when a drone recives a DroneCommand Crash from the controller
      #[test]
      fn test_drone_command_crash() {
          let (
