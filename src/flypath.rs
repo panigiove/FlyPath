@@ -253,7 +253,7 @@ impl FlyPath {
                 if !self.packet_send.contains_key(&next_hop) {
                     // Next hop is not a neighbour
                     return Some(NackType::ErrorInRouting(
-                        packet.routing_header.hops[packet.routing_header.hop_index],
+                        next_hop,
                     ));
                 }
             }
@@ -277,7 +277,7 @@ impl FlyPath {
 
     fn floodresponse_creator(&self, packet: &Packet, flood_request: &FloodRequest) -> Packet {
         let mut reverse_hops = Vec::new();
-        for (i) in flood_request.path_trace {
+        for (i) in &flood_request.path_trace {
             reverse_hops.push(i.0);
         }
         reverse_hops.reverse();
@@ -614,6 +614,91 @@ mod tests {
         }
         drone_thread.join().unwrap();
     }
+    //TODO: test crash
+    // da correggere
+    #[test]
+    fn test_drone_crash_behavior() {
+        use std::thread;
+        use std::time::Duration;
+
+        // Imposta un drone di test con canali di comunicazione
+        let (
+            mut drone,
+            test_event_recv,
+            test_command_send,
+            test_packet_recv,
+            test_packet_send,
+            client_reciver,
+        ) = setup_test_drone(0.0); // Nessuna probabilità di perdita per testare solo la logica del crash
+
+        // Invia pacchetti alla coda del drone
+        let flood_request_packet = Packet {
+            pack_type: PacketType::FloodRequest(FloodRequest {
+                flood_id: 1,
+                initiator_id: 2,
+                path_trace: vec![],
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 0,
+                hops: vec![1, 2],
+            },
+            session_id: 1,
+        };
+
+        let ack_packet = Packet {
+            pack_type: PacketType::Ack( Ack {
+                fragment_index: 1,
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 0,
+                hops: vec![1, 2],
+            },
+            session_id: 2,
+        };
+
+        let invalid_packet = Packet {
+            pack_type: PacketType::MsgFragment(Fragment {
+                fragment_index: 0,
+                total_n_fragments: 1,
+                length: 100,
+                data: [0; 128],
+            }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 0,
+                hops: vec![1, 3],
+            },
+            session_id: 3,
+        };
+
+        // Invia pacchetti al drone
+        test_packet_send.send(flood_request_packet).unwrap();
+        test_packet_send.send(ack_packet.clone()).unwrap();
+        test_packet_send.send(invalid_packet.clone()).unwrap();
+
+        // Invia il comando di crash
+        test_command_send.send(DroneCommand::Crash).unwrap();
+
+        // Avvia il drone in un thread separato
+        let handle = thread::spawn(move || drone.run());
+
+        // Attendi per dare tempo al drone di processare i pacchetti
+        thread::sleep(Duration::from_secs(1));
+
+        // Controlla che i pacchetti siano stati gestiti correttamente
+        // Ack e Nack (dall'invalid_packet) dovrebbero essere stati inoltrati
+        if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
+            assert_eq!(nack.nack_type, NackType::ErrorInRouting(3));
+        }
+
+        // Verifica che lo stato di crash abbia svuotato i messaggi
+        assert!(test_event_recv.is_empty());
+        assert!(test_packet_recv.is_empty());
+
+        // Aspetta il termine del thread del drone
+        handle.join().unwrap();
+    }
+
+
     //TODO: test di corretto invio di controller shorcut
     //TODO: test per flooding
 }
