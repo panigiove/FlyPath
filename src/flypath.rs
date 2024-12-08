@@ -5,9 +5,7 @@ use wg_2024::controller::DroneEvent::ControllerShortcut;
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{
-    FloodRequest, Nack, NackType, NodeType, Packet, PacketType,
-};
+use wg_2024::packet::{FloodRequest, Nack, NackType, NodeType, Packet, PacketType};
 
 // TODO: crash
 // TODO: floodrequest
@@ -486,6 +484,7 @@ mod tests {
     use super::*;
     use crossbeam_channel::unbounded;
     use wg_2024::packet::{Ack, Fragment, FloodRequest};
+    use wg_2024::packet::PacketType::Nack;
     use wg_2024::tests;
 
     // virtual connected drone's ID is 2.
@@ -859,5 +858,44 @@ mod tests {
      }
 
     //TODO: test di corretto invio di controller shorcut
+
+    #[test]
+    fn test_controller_shortcut(){
+        let (drone_event_send, test_event_recv) = unbounded();
+        let (test_command_send, drone_command_recv) = unbounded();
+        let (test_packet_send, drone_packet_recv) = unbounded();
+        let (drone_packet_send, test_packet_recv) = unbounded();
+        let (client_sender, client_reciver) = unbounded();
+        let mut drone = FlyPath::new(
+            1,
+            drone_event_send,
+            drone_command_recv,
+            drone_packet_recv,
+            vec![(2, drone_packet_send), (3, client_sender)]
+                .into_iter()
+                .collect(), 0.0);
+
+        // dovrebbbe generare un nack con ErrorInRouting(4)
+        let ack_packet = Packet {
+            pack_type: PacketType::Ack(Ack { fragment_index: 1 }),
+            routing_header: SourceRoutingHeader {
+                hop_index: 1,
+                hops: vec![2, 1, 4],
+            },
+            session_id: 2,
+        };
+
+        thread::spawn(move || {drone.run()});
+
+        test_packet_send.send(ack_packet).unwrap();
+
+        //da rifare
+        if let Ok(packet) = test_event_recv.try_recv() {
+            if let PacketType::Nack(nack) = packet {
+                assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
+            }
+        }
+    }
+
     //TODO: test per flooding
 }
