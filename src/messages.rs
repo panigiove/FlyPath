@@ -38,7 +38,7 @@ use wg_2024::{
 ///   or `Messages::drone_command_to_string`, and the `FlyPathThemes` `Display` implementation to retrieve
 ///   properly formatted strings.
 /// - The structure is compatible with the modes and themes defined in the `FlyPathModes` enum.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Messages {
     spicy: HashMap<String, HashMap<String, Vec<String>>>,
     brainrot: HashMap<String, Vec<String>>,
