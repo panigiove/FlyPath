@@ -115,7 +115,11 @@
         }
     },
     "brainrot": {
-        "PacketSent": [],
+        "PacketSent": [
+            "I accidently ruined the packet by eating my Pizza Pie on it, anyway", 
+            "OMG Kay is planning his mafiathon 3. What is this? A packet pff I will send it without protection",
+            ""
+        ],
         "PacketDropped": [],
         "ControllerShortcut": [],
         "RemoveSender": [],
