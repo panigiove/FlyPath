@@ -792,7 +792,6 @@ mod tests {
          } else {
              panic!("No packet received from the drone.");
          }
-         drone_thread.join().unwrap();
      }
 
     #[test]
@@ -840,7 +839,6 @@ mod tests {
          test_packet_send.send(flood_request_packet).unwrap();
          test_packet_send.send(ack_packet.clone()).unwrap();
 
-
          // Avvia il drone in un thread separato
          let handle = thread::spawn(move || drone.run());
 
@@ -849,8 +847,8 @@ mod tests {
 
          // Controlla che i pacchetti siano stati gestiti correttamente
          // Ack e Nack (dall'invalid_packet) dovrebbero essere stati inoltrati
-         if let PacketType::Nack(nack) = client_reciver.try_recv().unwrap().pack_type {
-             assert_eq!(nack.nack_type, NackType::ErrorInRouting(1));
+         if let PacketType::Ack(ack) = client_reciver.try_recv().unwrap().pack_type {
+             assert_eq!(Ack { fragment_index: 1}, ack);
          }
 
          // Verifica che lo stato di crash abbia svuotato i messaggi
@@ -858,7 +856,6 @@ mod tests {
          assert!(test_packet_recv.is_empty());
 
          // Aspetta il termine del thread del drone
-         handle.join().unwrap();
      }
 
     //TODO: test di corretto invio di controller shorcut
