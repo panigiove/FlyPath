@@ -13,7 +13,33 @@ rand = "0.8.5"
 [features]
 modes=[]
 
-
 [dev-dependencies]
 toml = "0.8.19"
 crossbeam-channel = "0.5.13"
+
+[[example]]
+name = "default_command" 
+path = "examples/default/command.rs" 
+
+[[example]]
+name = "default_packet" 
+path = "examples/default/packet.rs"
+
+[[example]]
+name = "default_flood_request" 
+path = "examples/default/flood_request.rs"
+
+[[example]]
+name = "spicy_command" 
+path = "examples/spicy/command.rs" 
+required-features = ["modes"]
+
+[[example]]
+name = "spicy_packet" 
+path = "examples/spicy/packet.rs"
+required-features = ["modes"]
+
+[[example]]
+name = "spicy_flood_request" 
+path = "examples/spicy/flood_request.rs"
+required-features = ["modes"]
