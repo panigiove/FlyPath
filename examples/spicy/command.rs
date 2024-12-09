@@ -23,11 +23,11 @@ fn main() {
         d2_command_send,
     ) = setup(0.0, 0.0);
 
-    let handler_d1 = thread::spawn(move || {
+    let _handler_d1 = thread::spawn(move || {
         d1.run();
     });
 
-    let handler_d2 = thread::spawn(move || {
+    let _handler_d2 = thread::spawn(move || {
         d2.run();
     });
 
@@ -65,13 +65,13 @@ fn main() {
         );
     }
 
-    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)){
+    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)) {
         if let Some((node_id, fly_path_msg)) = flyPath::extract_flypath_message(&event) {
             println!("{node_id} - {}", fly_path_msg);
-        }else {
-            if let DroneEvent::PacketSent(_) = event{
+        } else {
+            if let DroneEvent::PacketSent(_) = event {
                 println!("normal PacketSent event");
-            }else{
+            } else {
                 println!("normal PacketDropped event");
             }
         }
@@ -104,13 +104,13 @@ fn main() {
 
     // wait for a event
 
-    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)){
+    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)) {
         if let Some((node_id, fly_path_msg)) = flyPath::extract_flypath_message(&event) {
             println!("{node_id} - {}", fly_path_msg);
-        }else {
-            if let DroneEvent::PacketSent(_) = event{
+        } else {
+            if let DroneEvent::PacketSent(_) = event {
                 println!("normal PacketSent event");
-            }else{
+            } else {
                 println!("normal PacketDropped event");
             }
         }
@@ -134,18 +134,18 @@ fn main() {
             packet.pack_type,
             PacketType::Nack(wg_2024::packet::Nack {
                 fragment_index: 1,
-                nack_type: wg_2024::packet::NackType::ErrorInRouting((2))
+                nack_type: wg_2024::packet::NackType::ErrorInRouting(2)
             })
         );
     }
 
-    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)){
+    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)) {
         if let Some((node_id, fly_path_msg)) = flyPath::extract_flypath_message(&event) {
             println!("{node_id} - {}", fly_path_msg);
-        }else {
-            if let DroneEvent::PacketSent(_) = event{
+        } else {
+            if let DroneEvent::PacketSent(_) = event {
                 println!("normal PacketSent event");
-            }else{
+            } else {
                 println!("normal PacketDropped event");
             }
         }
@@ -158,13 +158,13 @@ fn main() {
     d1_command_send.send(DroneCommand::Crash).unwrap();
     drop(d1_send);
 
-    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)){
+    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)) {
         if let Some((node_id, fly_path_msg)) = flyPath::extract_flypath_message(&event) {
             println!("{node_id} - {}", fly_path_msg);
-        }else {
-            if let DroneEvent::PacketSent(_) = event{
+        } else {
+            if let DroneEvent::PacketSent(_) = event {
                 println!("normal PacketSent event");
-            }else{
+            } else {
                 println!("normal PacketDropped event");
             }
         }

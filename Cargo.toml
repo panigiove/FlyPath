@@ -38,8 +38,3 @@ required-features = ["modes"]
 name = "spicy_packet" 
 path = "examples/spicy/packet.rs"
 required-features = ["modes"]
-
-[[example]]
-name = "spicy_flood_request" 
-path = "examples/spicy/flood_request.rs"
-required-features = ["modes"]

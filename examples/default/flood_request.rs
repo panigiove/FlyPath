@@ -40,7 +40,8 @@ fn main() {
 
     // wait for a response
     sleep(Duration::from_secs(1));
-    let packet: Result<Packet, crossbeam_channel::RecvTimeoutError> = c1_recv.recv_timeout(Duration::from_secs(1));
+    let packet: Result<Packet, crossbeam_channel::RecvTimeoutError> =
+        c1_recv.recv_timeout(Duration::from_secs(1));
 
     // packet should be FloodResponse and have all the hops
     let expected = flood_request
@@ -59,20 +60,21 @@ fn main() {
 
     // wait for a response
     sleep(Duration::from_secs(1));
-    let event : Result<DroneEvent, crossbeam_channel::RecvTimeoutError> = from_d2_event_recv.recv_timeout(Duration::from_secs(1));
-    
+    let event: Result<DroneEvent, crossbeam_channel::RecvTimeoutError> =
+        from_d2_event_recv.recv_timeout(Duration::from_secs(1));
+
     // event should be Shortcut
     assert!(event.is_ok());
-    if let Ok(DroneEvent::ControllerShortcut(packet)) = event{
+    if let Ok(DroneEvent::ControllerShortcut(packet)) = event {
         assert_eq!(packet.pack_type, expected.clone().pack_type);
-    }else {
+    } else {
         panic!("not Controller Shortcut")
     }
 }
 
 fn setup(
     pdr_d1: f32,
-    pdr_d2: f32
+    pdr_d2: f32,
 ) -> (
     FlyPath,
     FlyPath,

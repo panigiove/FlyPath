@@ -33,7 +33,11 @@ fn main() {
 
     // *CASE* Packet error in routing
     // send invalid packet
-    let packet_from_c1_to_d15 = Packet::new_fragment(SourceRoutingHeader::with_first_hop(vec![10,1,15]), 1, Fragment::from_string(1, 1, "quacknt".to_string()));
+    let packet_from_c1_to_d15 = Packet::new_fragment(
+        SourceRoutingHeader::with_first_hop(vec![10, 1, 15]),
+        1,
+        Fragment::from_string(1, 1, "quacknt".to_string()),
+    );
     d1_send.send(packet_from_c1_to_d15).unwrap();
 
     // wait for a response
@@ -53,7 +57,11 @@ fn main() {
     }
 
     // *CASE* Packet destination is drone
-    let packet_from_c1_to_d15 = Packet::new_fragment(SourceRoutingHeader::with_first_hop(vec![10,1]), 1, Fragment::from_string(1, 1, "quacknt".to_string()));
+    let packet_from_c1_to_d15 = Packet::new_fragment(
+        SourceRoutingHeader::with_first_hop(vec![10, 1]),
+        1,
+        Fragment::from_string(1, 1, "quacknt".to_string()),
+    );
     d1_send.send(packet_from_c1_to_d15).unwrap();
 
     // wait for a response
@@ -72,9 +80,13 @@ fn main() {
         );
     }
     // *CASE* Packet dropped view `command.rs`
-    
+
     // *CASE* Packet UnexpectedRecipient
-    let packet_from_c1_to_d15 = Packet::new_fragment(SourceRoutingHeader::with_first_hop(vec![10,2]), 1, Fragment::from_string(1, 1, "quacknt".to_string()));
+    let packet_from_c1_to_d15 = Packet::new_fragment(
+        SourceRoutingHeader::with_first_hop(vec![10, 2]),
+        1,
+        Fragment::from_string(1, 1, "quacknt".to_string()),
+    );
     d1_send.send(packet_from_c1_to_d15).unwrap();
 
     // wait for a response
@@ -92,7 +104,6 @@ fn main() {
             })
         );
     }
-    
 }
 
 // d1 is a spicy drone and d2 is a normal drone

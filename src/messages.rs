@@ -1,7 +1,7 @@
 use crate::flypath::FlyPathModes;
 use rand::Rng;
 use serde::Deserialize;
-use std::{collections::HashMap, fs, u64};
+use std::{collections::HashMap, fs};
 use wg_2024::{
     controller::{DroneCommand, DroneEvent},
     network::{NodeId, SourceRoutingHeader},
@@ -92,9 +92,9 @@ impl Messages {
     /// - `None`: If no messages are found.
     pub fn get_rand_message(&self, mode: &FlyPathModes, event_or_command: &str) -> Option<String> {
         self.get_messages_for_mode(mode, event_or_command)
-            .and_then(|messages| {
+            .map(|messages| {
                 let rand_index = rand::thread_rng().gen_range(0..messages.len());
-                Some(messages[rand_index].clone())
+                messages[rand_index].clone()
             })
     }
 
@@ -127,7 +127,7 @@ impl Messages {
         if let Some(message) = self.get_rand_message(mode, event_or_command) {
             let bytes = message.into_bytes();
             if bytes.len() > FRAGMENT_DSIZE {
-                Err(format!("Failed to generate a message: Too Long"))
+                Err("Failed to generate a message: Too Long".to_string())
             } else {
                 let fragment = Fragment {
                     fragment_index: u64::MAX,
@@ -187,6 +187,7 @@ impl Messages {
 /// # Examples
 /// ```rust
 /// // Assuming `event` is a valid FlyPath DroneEvent:
+/// use flyPath::extract_flypath_message;
 /// if let Some((node_id, message)) = extract_flypath_message(&event) {
 ///     println!("FlyPath Event Detected! Node: {}, Message: {}", node_id, message);
 /// } else {
@@ -204,7 +205,7 @@ pub fn extract_flypath_message(event: &DroneEvent) -> Option<(NodeId, String)> {
                 && fragment.total_n_fragments == 0
             {
                 // We can assume for sure that this special invalid Fragment is FlyPath Fragment
-                let node_id = packet.routing_header.hops.get(0).unwrap();
+                let node_id = packet.routing_header.hops.first().unwrap();
                 return Some((
                     *node_id,
                     String::from_utf8_lossy(&fragment.data[..fragment.length as usize]).to_string(),
@@ -217,8 +218,6 @@ pub fn extract_flypath_message(event: &DroneEvent) -> Option<(NodeId, String)> {
 
 #[cfg(test)]
 mod tests {
-    use std::result;
-
     use super::*;
     use crate::flypath::FlyPathThemes;
 

@@ -34,7 +34,11 @@ fn main() {
     // *CASE* PackedSent
     println!("PACKET SENDED");
     // send valid packet
-    let packet_from_c1_to_d2 = Packet::new_fragment(SourceRoutingHeader::with_first_hop(vec![10,1,2]), 1, Fragment::from_string(1, 1, "quacknt".to_string()));
+    let packet_from_c1_to_d2 = Packet::new_fragment(
+        SourceRoutingHeader::with_first_hop(vec![10, 1, 2]),
+        1,
+        Fragment::from_string(1, 1, "quacknt".to_string()),
+    );
     d1_send.send(packet_from_c1_to_d2).unwrap();
 
     // wait for a response
@@ -53,18 +57,18 @@ fn main() {
         );
     }
 
-    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)){
+    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)) {
         if let Some((node_id, fly_path_msg)) = flyPath::extract_flypath_message(&event) {
             println!("{node_id} - {}", fly_path_msg);
-        }else {
-            if let DroneEvent::PacketSent(_) = event{
+        } else {
+            if let DroneEvent::PacketSent(_) = event {
                 println!("normal PacketSent event");
-            }else{
+            } else {
                 println!("normal PacketDropped event");
             }
         }
     }
-    
+
     // *CASE* PacketDropped
     println!("PACKET DROPPED");
     let (
@@ -88,7 +92,11 @@ fn main() {
     });
 
     // send valid packet
-    let packet_from_c1_to_d2 = Packet::new_fragment(SourceRoutingHeader::with_first_hop(vec![10,1,2]), 1, Fragment::from_string(1, 1, "quacknt".to_string()));
+    let packet_from_c1_to_d2 = Packet::new_fragment(
+        SourceRoutingHeader::with_first_hop(vec![10, 1, 2]),
+        1,
+        Fragment::from_string(1, 1, "quacknt".to_string()),
+    );
     d1_send.send(packet_from_c1_to_d2).unwrap();
 
     // wait for a response
@@ -107,18 +115,17 @@ fn main() {
         );
     }
 
-    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)){
+    while let Ok(event) = from_d1_event_recv.recv_timeout(Duration::from_secs(1)) {
         if let Some((node_id, fly_path_msg)) = flyPath::extract_flypath_message(&event) {
             println!("{node_id} - {}", fly_path_msg);
-        }else {
-            if let DroneEvent::PacketSent(_) = event{
+        } else {
+            if let DroneEvent::PacketSent(_) = event {
                 println!("normal PacketSent event");
-            }else{
+            } else {
                 println!("normal PacketDropped event");
             }
         }
     }
-
 }
 
 // d1 is a spicy drone and d2 is a normal drone
