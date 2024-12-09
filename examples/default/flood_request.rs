@@ -53,7 +53,7 @@ fn main() {
         assert_eq!(packet.pack_type, expected.pack_type);
     }
 
-    // *CASE* d2 can't send FloodRequest to d1 so it must use ShortCut
+    // *CASE* d2 can't send FloodResponse to d1 so it must use ShortCut
     // send command to remove d1 and flood request
     d2_command_send.send(DroneCommand::RemoveSender(1)).unwrap();
     d2_send.send(expected.clone()).unwrap();

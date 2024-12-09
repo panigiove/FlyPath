@@ -197,7 +197,7 @@ fn setup(
     let (d2_command_send, d2_command_recv) = unbounded();
 
     let d1 = FlyPath::new_with_mode(
-        flyPath::FlyPathModes::Spicy(flyPath::FlyPathThemes::Batman),
+        flyPath::FlyPathModes::Spicy(flyPath::FlyPathThemes::Bloodborne),
         1,
         d1_event_send,
         d1_command_recv,
