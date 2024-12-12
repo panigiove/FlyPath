@@ -703,7 +703,6 @@ mod tests {
     #[cfg(feature = "modes")]
     #[test]
     fn test_flood_request() {
-
         let (
             mut drone_brainrot,
             test_event_recv_br,
@@ -734,13 +733,12 @@ mod tests {
         let result = test_packet_recv_br.recv_timeout(Duration::from_secs(1));
         assert!(result.is_ok());
         let r_packet: Packet = result.unwrap();
-        assert_ne!(expected.pack_type,r_packet.pack_type);
+        assert_ne!(expected.pack_type, r_packet.pack_type);
 
         let result_controller = test_event_recv_br.recv_timeout(Duration::from_secs(1));
         assert!(result_controller.is_ok());
         let messages = extract_flypath_message(&result_controller.unwrap());
         assert!(messages.is_some());
-        
     }
 
     #[cfg(feature = "modes")]
@@ -760,7 +758,9 @@ mod tests {
         });
 
         // maybeAddSender
-        test_command_send_br.send(DroneCommand::AddSender(10, unbounded().0)).unwrap();
+        test_command_send_br
+            .send(DroneCommand::AddSender(10, unbounded().0))
+            .unwrap();
         sleep(Duration::from_secs(1));
         let result_controller = test_event_recv_br.recv_timeout(Duration::from_secs(1));
         assert!(result_controller.is_ok());
@@ -785,7 +785,9 @@ mod tests {
             drone_brainrot.run();
         });
         // maybeSetPdr
-        test_command_send_br.send(DroneCommand::SetPacketDropRate(0.0)).unwrap();
+        test_command_send_br
+            .send(DroneCommand::SetPacketDropRate(0.0))
+            .unwrap();
         sleep(Duration::from_secs(1));
         let result_controller = test_event_recv_br.recv_timeout(Duration::from_secs(1));
         assert!(result_controller.is_ok());
@@ -811,7 +813,9 @@ mod tests {
         });
 
         // maybeRemoveSender
-        test_command_send_br.send(DroneCommand::RemoveSender(2)).unwrap();
+        test_command_send_br
+            .send(DroneCommand::RemoveSender(2))
+            .unwrap();
         sleep(Duration::from_secs(1));
         let result_controller = test_event_recv_br.recv_timeout(Duration::from_secs(1));
         assert!(result_controller.is_ok());
@@ -819,6 +823,4 @@ mod tests {
         assert!(messages.is_some());
         println!("{:?}", messages);
     }
-
-    
 }

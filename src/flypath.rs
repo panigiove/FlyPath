@@ -341,7 +341,7 @@ impl FlyPath {
                 }
             }
             _ => {
-                if let Some(_) = packet.routing_header.current_hop() {
+                if packet.routing_header.current_hop().is_some() {
                     if let Some(nack) = self.validate_packet(&packet) {
                         self.send_nack(&packet, nack);
                         return;
@@ -373,24 +373,21 @@ impl FlyPath {
     // - DestinationIsDrone
     fn validate_packet(&self, packet: &Packet) -> Option<NackType> {
         let current_hop = packet.routing_header.current_hop();
-        match current_hop {
-            Some(current_hop) => {
-                if current_hop != self.id {
-                    return Some(NackType::UnexpectedRecipient(self.id));
-                } else {
-                    match packet.routing_header.next_hop() {
-                        Some(next_hop) => {
-                            if !self.packet_send.contains_key(&next_hop) {
-                                // Next hop is not a neighbour
-                                return Some(NackType::ErrorInRouting(next_hop));
-                            }
+        if let Some(current_hop) = current_hop {
+            if current_hop != self.id {
+                return Some(NackType::UnexpectedRecipient(self.id));
+            } else {
+                match packet.routing_header.next_hop() {
+                    Some(next_hop) => {
+                        if !self.packet_send.contains_key(&next_hop) {
+                            // Next hop is not a neighbour
+                            return Some(NackType::ErrorInRouting(next_hop));
                         }
-                        // No next hop
-                        None => return Some(NackType::DestinationIsDrone),
                     }
+                    // No next hop
+                    None => return Some(NackType::DestinationIsDrone),
                 }
             }
-            None => {} // if none ignore
         }
         None
     }
