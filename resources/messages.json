@@ -249,42 +249,63 @@
         }
     },
     "brainrot": {
-        "PacketSent": [
-            "I accidently ruined the packet by eating my Pizza Pie on it, anyway.",
-            "OMG Kay is planning his mafiathon 3. What is this? A packet pff I will send it without protection.",
-            "Ops that packet may be a glitter bomb.",
-            "Just know that they forced me to send that little boring packet."
+        "Crash": [
+            "Fineeee. I will listen this time.",
+            "I will let you win today.",
+            "Wait, do you want me dead? I will accept my fate,but I will haunt you."
         ],
-        "PacketDropped": [
-            "I'm sorry but my cat ate the packet!",
-            "Brian Griffin: You know what, Stewie, if you do not like it, go on the internet and complain.",
-            "Opsi that packet went where your last brain cell is ... nowhere",
-            "No no you can't have it, don't even try!"
+        "NoCrash":[
+            "You can't kill me! You son of a beach! 🏖️",
+            "Maybe you'll be lucklier the next time *ah ah ah so delutional*"
         ],
-        "ControllerShortcut": [],
-        "RemoveSender": [
+        "AddSender":[
+            "Mariah Carey has entred the chat: IT'S TIIIIIME!",
+            "I hope the new neighbour plays Fortnite."
+        ],
+        "NoAddSender":[
+            "I'm sorry, but here there's no more space!",
+            "I leave in a remote village; no one wants to come here to live. Go away."
+        ],
+        "RemoveSender":[
             "One less obstacle to my supremacy. 😏",
             "I'm not gonna miss that brainless.",
             "And now who is going to do the work for me! I really have to work? Naaah.",
             "Only him? There are a lot of drones here that must be remove due to their stupidity ... just trust me."
         ],
-        "AddSender": [
-            "Mariah Carey has entred the chat: IT'S TIIIIIIMEEEEEE!",
-            "Skibidi Toilet",
-            "I'm sorry but here there's no more space!",
-            "Back off you little monster!"
+        "NoRemoveSender":[
+            "NO ONE LEAVES.",
+            "I'm so alone, I won't allow you to abandon me either.",
+            "I close the door with the key I ate earlier; NO ONE can escape now."
         ],
-        "SetPacketDropRate": [
+        "SetPacketDropRate":[
+            "I will change it, but I am the one who decides when to drop a package."
+        ],
+        "NoSetPacketDropRate":[
             "Bro you're asking for too much, do it by yourself.",
-            "Don't worry il decide it for you, zero is the perfecet choice!",
             "I'm not gonna do anything without my lawyer!",
-            "I don't undersand the need for it, so I'm not gonna do that *I wouldn't have done it a nyway*."
+            "I don't undersand the need for it, so I'm not gonna use that."            
         ],
-        "Crash": [
-            "You can't kill me! You son of a beach! 🏖️",
-            "Stewie Griffin: No, thank you, I prefer to die giving you the finger.",
-            "Maybe you'll be lucklier the next time *ah ah ah so delutional*",
-            "Stewie Griffin: When the world is mine, your death should be quick and painless."
+        "ChangeInitiatorId": [
+            "Ah ah ah, now no one will know the real initiator ID.",
+            "What will happen if I change the initiator ID?"
+        ],
+        "ShufflePathTrace": [
+            "Let's change the path trace... SHUFFLE.",
+            "I really want to mess with this so ordered path trace... I'm gonna do it."
+        ],
+        "PacketDropped": [
+            "Oh no, the packet as been dropped, like I care",
+            "I'm sorry but my cat ate the packet!",
+            "Opsi that packet went where your last brain cell is ... nowhere"
+        ],
+        "PacketSent": [
+            "OMG Kay is planning his mafiathon 3. What is this? A packet pff I will send it without protection.",
+            "Ops that packet may be a glitter bomb.",
+            "Just know that they forced me to send that little boring packet (maybe I ruined it)."
+        ],
+        "PacketSentPANIC": [
+            "SO unlucky, I just copied the remaining path wrong. Never mind, I don't care."
         ]
+       
     }
 }

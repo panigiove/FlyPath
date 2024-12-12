@@ -9,8 +9,11 @@ use wg_2024::packet::{Nack, NackType, NodeType, Packet, PacketType};
 #[cfg(feature = "modes")]
 use crate::messages::Messages;
 #[cfg(feature = "modes")]
+use rand::seq::SliceRandom;
+#[cfg(feature = "modes")]
 use std::fmt;
-
+#[cfg(feature = "modes")]
+use wg_2024::packet::{FloodRequest, Fragment};
 /// Enum representing the enabled fly path modes.
 #[derive(Debug, Clone)]
 pub enum FlyPathModes {
@@ -119,8 +122,14 @@ impl Drone for FlyPath {
                                     }
                                     #[cfg(feature = "modes")]
                                     FlyPathModes::BrainRot => {
-                                        self.command_flypath_message(&cmd);
-                                        // TODO: continue or other stuff
+                                        let should_crash = 50 < rand::thread_rng().gen_range(0..100);
+                                        if should_crash {
+                                            self.brainRot_event_flypath_message("Crash");
+                                            break;
+                                        }else{
+                                            self.brainRot_event_flypath_message("NoCrash");
+                                            continue;
+                                        }
                                     }
                                 };
                             },
@@ -208,6 +217,16 @@ impl FlyPath {
         }
     }
 
+    #[cfg(feature = "modes")]
+    fn brainRot_event_flypath_message(&mut self, brainRot_event: &str) {
+        let flyPath_messages =
+            self.messages
+                .generate_droneEvent_to_controller(&self.mode, brainRot_event, self.id);
+        if let Ok(Some(msg)) = flyPath_messages {
+            self.send_event(msg);
+        }
+    }
+
     // Handler AddSender, RemoveSender and Set packet drop rate
     fn command_handler(&mut self, cmd: DroneCommand) {
         match &cmd {
@@ -223,8 +242,14 @@ impl FlyPath {
                     }
                     #[cfg(feature = "modes")]
                     FlyPathModes::BrainRot => {
-                        self.command_flypath_message(&cmd);
-                        // TODO: do nothing or other
+                        // 50/50 add the sender
+                        let should_add_sender = 50 > rand::thread_rng().gen_range(0..100);
+                        if should_add_sender {
+                            self.brainRot_event_flypath_message("AddSender");
+                            self.packet_send.insert(*id, sender.clone());
+                        } else {
+                            self.brainRot_event_flypath_message("NoAddSender");
+                        }
                     }
                 };
             }
@@ -241,8 +266,14 @@ impl FlyPath {
                     }
                     #[cfg(feature = "modes")]
                     FlyPathModes::BrainRot => {
-                        self.command_flypath_message(&cmd);
-                        // TODO: don't remove or other
+                        // 50/50 remove the sender
+                        let should_remove_sender = 50 > rand::thread_rng().gen_range(0..100);
+                        if should_remove_sender {
+                            self.brainRot_event_flypath_message("RemoveSender");
+                            self.packet_send.remove(id);
+                        } else {
+                            self.brainRot_event_flypath_message("NoRemoveSender");
+                        }
                     }
                 };
             }
@@ -258,8 +289,14 @@ impl FlyPath {
                     }
                     #[cfg(feature = "modes")]
                     FlyPathModes::BrainRot => {
-                        self.command_flypath_message(&cmd);
-                        // TODO: don't change or change it in unexpected way
+                        // 50/50 change pdr
+                        let should_change_pdr = 50 > rand::thread_rng().gen_range(0..100);
+                        if should_change_pdr {
+                            self.brainRot_event_flypath_message("SetPacketDropRate");
+                            self.pdr = *pdr;
+                        } else {
+                            self.brainRot_event_flypath_message("NoSetPacketDropRate");
+                        }
                     }
                 };
             }
@@ -269,11 +306,17 @@ impl FlyPath {
 
     // Manage FloodRequest, if not FloodRequest: check the packat , drop it in case, send the packet
     fn packet_handler(&mut self, mut packet: Packet) {
-        match &packet.pack_type {
+        match &mut packet.pack_type {
             PacketType::FloodRequest(flood_request) => {
                 if let Some((last_nodeId, _)) = flood_request.path_trace.last() {
-                    let updated_flood_request =
+                    #[allow(unused_mut)]
+                    let mut updated_flood_request =
                         flood_request.get_incremented(self.id, NodeType::Drone);
+
+                    #[cfg(feature = "modes")]
+                    if let FlyPathModes::BrainRot = self.mode {
+                        self.maybe_invalidate_floodRequest(&mut updated_flood_request);
+                    }
 
                     if !self.precFloodId.contains(&(
                         updated_flood_request.flood_id,
@@ -286,7 +329,9 @@ impl FlyPath {
                             pack_type: PacketType::FloodRequest(updated_flood_request.clone()),
                         };
                         for (node_id, sender) in &self.packet_send {
-                            if node_id != last_nodeId { let _ = sender.send(packet_to_send.clone()); }
+                            if node_id != last_nodeId {
+                                let _ = sender.send(packet_to_send.clone());
+                            }
                         }
                     } else {
                         let mut response =
@@ -296,22 +341,28 @@ impl FlyPath {
                 }
             }
             _ => {
-                if let Some(nack) = self.validate_packet(&packet) {
-                    self.send_nack(&packet, nack);
-                    return;
-                }
-
-                if let PacketType::MsgFragment(_) = &packet.pack_type {
-                    let should_drop_packet = self.pdr > rand::thread_rng().gen_range(0.0..1.0);
-                    if should_drop_packet {
-                        // Drop the fragment and send Dropped Event
-                        self.send_nack(&packet, NackType::Dropped);
+                if let Some(_) = packet.routing_header.current_hop() {
+                    if let Some(nack) = self.validate_packet(&packet) {
+                        self.send_nack(&packet, nack);
                         return;
                     }
-                }
 
-                // The packet is a `Nack`, `Ack`, `FloodResponse` or a non dropped `MsgFragment`
-                self.send_packet(&mut packet);
+                    #[cfg(feature = "modes")]
+                    if let FlyPathModes::BrainRot = self.mode {
+                        self.pdr = rand::thread_rng().gen_range(0.0..1.0);
+                    }
+
+                    if let PacketType::MsgFragment(_) = &packet.pack_type {
+                        let should_drop_packet = self.pdr > rand::thread_rng().gen_range(0.0..1.0);
+                        if should_drop_packet {
+                            // Drop the fragment and send Dropped Event
+                            self.send_nack(&packet, NackType::Dropped);
+                            return;
+                        }
+                    }
+                    // The packet is a `Nack`, `Ack`, `FloodResponse` or a non dropped `MsgFragment`
+                    self.send_packet(&mut packet);
+                }
             }
         }
     }
@@ -321,28 +372,26 @@ impl FlyPath {
     // - ErrorInRouting
     // - DestinationIsDrone
     fn validate_packet(&self, packet: &Packet) -> Option<NackType> {
-        // Packet forward to the wrong drone
-        if self.id != packet.routing_header.hops[packet.routing_header.hop_index] {
-            return Some(NackType::UnexpectedRecipient(self.id));
-        }
-
         let current_hop = packet.routing_header.current_hop();
-        match current_hop{
-            Some(current_hop) => {if current_hop != self.id {return Some(NackType::UnexpectedRecipient(self.id))}}
-            None => return Some(NackType::ErrorInRouting(self.id))
-        }
-
-        match packet.routing_header.next_hop() {
-            Some(next_hop) => {
-                if !self.packet_send.contains_key(&next_hop) {
-                    // Next hop is not a neighbour
-                    return Some(NackType::ErrorInRouting(next_hop));
+        match current_hop {
+            Some(current_hop) => {
+                if current_hop != self.id {
+                    return Some(NackType::UnexpectedRecipient(self.id));
+                } else {
+                    match packet.routing_header.next_hop() {
+                        Some(next_hop) => {
+                            if !self.packet_send.contains_key(&next_hop) {
+                                // Next hop is not a neighbour
+                                return Some(NackType::ErrorInRouting(next_hop));
+                            }
+                        }
+                        // No next hop
+                        None => return Some(NackType::DestinationIsDrone),
+                    }
                 }
             }
-            // No next hop
-            None => return Some(NackType::DestinationIsDrone),
+            None => {} // if none ignore
         }
-        // Valid Packet
         None
     }
 
@@ -350,41 +399,50 @@ impl FlyPath {
     // Send `Nack` if there is no next hop or next hop sender
     fn send_packet(&mut self, packet: &mut Packet) {
         packet.routing_header.increase_hop_index();
-        let next_hop: NodeId = packet.routing_header.hops[packet.routing_header.hop_index];
+        if let Some(next_hop) = packet.routing_header.current_hop() {
+            #[cfg(feature = "modes")]
+            if let FlyPathModes::BrainRot = &self.mode {
+                // Change path or invalidate the content
+                let mut rng = rand::thread_rng();
 
-        // Check if there's a sender for the next hop
-        if let Some(sender) = self.packet_send.get_mut(&next_hop) {
-            // Attempt to send the packet
-            if sender.send(packet.clone()).is_err() {
-                // If sending fails, send a NACK indicating an error in routing
-                self.packet_send.remove(&next_hop);
+                let should_change_path_or_invalidate_content = 50 > rng.gen_range(0..100);
+                if should_change_path_or_invalidate_content {
+                    self.change_hops_randomly(&mut packet.routing_header);
+                    self.brainRot_event_flypath_message("PacketSent");
+                } else if let PacketType::MsgFragment(frag) = &mut packet.pack_type {
+                    self.invalidate_packet_content(frag);
+                    self.brainRot_event_flypath_message("PacketSentPANIC");
+                }
 
-                // Decrease hop index cus the packet is not sended
-                packet.routing_header.decrease_hop_index();
-                self.send_nack(packet, NackType::ErrorInRouting(next_hop));
-            } else if let PacketType::MsgFragment(_) = packet.pack_type {
-                // Behavior depending on the mode
-                match &self.mode {
-                    FlyPathModes::Default => {
-                        self.send_event(DroneEvent::PacketSent(packet.clone()))
-                    }
-                    #[cfg(feature = "modes")]
-                    FlyPathModes::Spicy(_theme) => {
+                if let Some(sender) = self.packet_send.get_mut(&next_hop) {
+                    if sender.send(packet.clone()).is_err() {
+                        packet.routing_header.decrease_hop_index();
+                        self.send_nack(packet, NackType::ErrorInRouting(next_hop));
+                    } else if let PacketType::MsgFragment(_) = packet.pack_type {
                         let event = DroneEvent::PacketSent(packet.clone());
-                        self.event_flypath_message(&event);
                         self.send_event(event);
                     }
-                    #[cfg(feature = "modes")]
-                    FlyPathModes::BrainRot => {
-                        let event = DroneEvent::PacketSent(packet.clone());
-                        self.event_flypath_message(&event);
-                    }
                 }
+                return;
             }
-        } else {
-            // If no sender is found for the next hop, send a NACK
-            packet.routing_header.decrease_hop_index();
-            self.send_nack(packet, NackType::ErrorInRouting(next_hop));
+
+            if let Some(sender) = self.packet_send.get_mut(&next_hop) {
+                if sender.send(packet.clone()).is_err() {
+                    self.packet_send.remove(&next_hop);
+                    packet.routing_header.decrease_hop_index();
+                    self.send_nack(packet, NackType::ErrorInRouting(next_hop));
+                } else if let PacketType::MsgFragment(_) = packet.pack_type {
+                    let event = DroneEvent::PacketSent(packet.clone());
+
+                    #[cfg(feature = "modes")]
+                    self.event_flypath_message(&event);
+
+                    self.send_event(event);
+                }
+            } else {
+                packet.routing_header.decrease_hop_index();
+                self.send_nack(packet, NackType::ErrorInRouting(next_hop));
+            }
         }
     }
 
@@ -424,7 +482,7 @@ impl FlyPath {
                     #[cfg(feature = "modes")]
                     FlyPathModes::BrainRot => {
                         let event = DroneEvent::PacketDropped(packet.clone());
-                        self.event_flypath_message(&event);
+                        self.brainRot_event_flypath_message("PacketDropped");
                         self.send_event(event);
                     }
                 }
@@ -453,6 +511,38 @@ impl FlyPath {
         reverse_hops.truncate(packet.routing_header.hop_index + 1);
         reverse_hops.reverse();
         reverse_hops
+    }
+
+    #[cfg(feature = "modes")]
+    fn change_hops_randomly(&self, routing_header: &mut SourceRoutingHeader) {
+        let hop_index = routing_header.hop_index;
+        // Ensure we have enough hops to modify
+        if hop_index + 1 < routing_header.hops.len() {
+            // Extract the portion of hops to be randomized
+            let remaining_hops = &mut routing_header.hops[(hop_index + 1)..];
+
+            // Shuffle the remaining hops
+            remaining_hops.shuffle(&mut rand::thread_rng());
+        }
+    }
+
+    #[cfg(feature = "modes")]
+    fn invalidate_packet_content(&mut self, fragment: &mut Fragment) {
+        fragment.data.shuffle(&mut rand::thread_rng());
+    }
+
+    #[cfg(feature = "modes")]
+    fn maybe_invalidate_floodRequest(&mut self, fReq: &mut FloodRequest) {
+        let mut rng = rand::thread_rng();
+
+        let should_change_initialator_or_path_trace = 50 > rng.gen_range(0..100);
+        if should_change_initialator_or_path_trace {
+            self.brainRot_event_flypath_message("ChangeInitiatorId");
+            fReq.initiator_id = rng.gen_range(0..31);
+        } else {
+            self.brainRot_event_flypath_message("ShufflePathTrace");
+            fReq.path_trace.shuffle(&mut rng);
+        }
     }
 }
 
