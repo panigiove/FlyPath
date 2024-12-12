@@ -4,9 +4,9 @@
 
 ## Modes
 
-- **Default (Boring) Mode**: The drone operates according to the specifications defined in the protocol file. This is the standard, predictable behavior.
+- **Default (Boring) Mode**: The drone operates according to the specifications defined in the protocol file. This is the standard and predictable behavior.
 - **Spicy Mode**: The drone enhances communication with themed messages sent to the simulation controller in response to commands or events, while still following the protocol.
-- **BrainRot Mode**: After prolonged exposure to content like Chinese TikTok Lives and *Skibidi Toilet* episodes on YouTube, the drone exhibits erratic and unpredictable behavior. In this mode, it may:
+- **BrainRot Mode**: After prolonged exposure to content like Chinese TikTok Lives and *Skibidi Toilet* episodes on YouTube, the drone exhibits erratic and unpredictable behaviors. In this mode, it may:
     - Modify the remaining path of a packet arbitrarily.
     - Encrypt packets unexpectedly.
     - Make independent decisions about dropping packets.
@@ -27,7 +27,6 @@ For any issues, bugs, or questions related to our drone, please contact us throu
 This library avoids direct access to arrays or vectors, and does not use `unwrap`. All `Result<>` and `Option<>` types are properly handled to prevent panics. The drone will ignore invalid packets and will only panic in the event of a critical error, such as an issue when attempting to send a `DroneEvent` to the controller.
 
 ## Installation
-if let Some(curr)
 Add the `flypath` dependency to your project's `Cargo.toml`:
 
 ```toml
@@ -242,6 +241,5 @@ The FlyPath project relies on the following key dependencies:
 - **`crossbeam-channel`**: Multi-threaded communication.
 - **`rand`**: Random number generation.
 - **`serde` and `serde_json`** (optional, enabled via `modes` feature): Serialization and JSON handling.
-
-Here is the corrected and improved version of the section about panics:
+- **`wg_2024`**: Code shared between groups.
 
