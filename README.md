@@ -31,7 +31,7 @@ Add the `flypath` dependency to your project's `Cargo.toml`:
 
 ```toml
 [dependencies]
-flypath = { git = "git@github.com:panigiove/FlyPath.git" }
+flyPath = { git = "https://github.com/panigiove/FlyPath.git" }
 ```
 
 ### Optional Feature: Modes
@@ -40,7 +40,7 @@ To enable the `modes` feature (which includes `Spicy` and `BrainRot` modes), upd
 
 ```toml
 [dependencies]
-flypath = { git = "git@github.com:panigiove/FlyPath.git", features = ["modes"] }
+flyPath = { git = "https://github.com/panigiove/FlyPath.git", features = ["modes"] }
 ```
 
 ### Update Dependencies
@@ -62,7 +62,9 @@ The `new` constructor creates a basic `FlyPath` drone instance. It is available 
 #### Signature:
 
 ```rust
-FlyPath::new(
+use flyPath::FlyPath;
+
+let flypath = FlyPath::new(
     id: NodeId, 
     controller_send: Sender, 
     controller_recv: Receiver, 
@@ -75,6 +77,8 @@ FlyPath::new(
 #### Example:
 
 ```rust
+use flyPath::FlyPath;
+
 let flypath = FlyPath::new(
     1, 
     controller_send, 
