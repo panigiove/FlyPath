@@ -64,7 +64,7 @@ The `new` constructor creates a basic `FlyPath` drone instance. It is available 
 ```rust
 use flyPath::FlyPath;
 
-let flypath = FlyPath::new(
+FlyPath::new(
     id: NodeId, 
     controller_send: Sender, 
     controller_recv: Receiver, 
@@ -98,6 +98,8 @@ The `new_with_mode` constructor allows specifying a custom mode for the drone. T
 #### Signature:
 
 ```rust
+use flyPath::FlyPath;
+
 FlyPath::new_with_mode(
     mode: FlyPathModes, 
     id: NodeId, 
@@ -120,6 +122,8 @@ FlyPath::new_with_mode(
 #### Example with a Custom Mode:
 
 ```rust
+use flyPath::FlyPath;
+
 let flypath = FlyPath::new_with_mode(
     FlyPathModes::Spicy(FlyPathThemes::DarkSouls),
     1, 
