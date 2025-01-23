@@ -323,6 +323,7 @@ impl FlyPath {
                         updated_flood_request.initiator_id,
                     )) && self.packet_send.len() > 1
                     {
+                        self.precFloodId.insert((updated_flood_request.flood_id, updated_flood_request.initiator_id));
                         let packet_to_send = Packet {
                             routing_header: packet.routing_header.clone(),
                             session_id: packet.session_id,
@@ -446,6 +447,11 @@ impl FlyPath {
     // Create and send a nack if the packet is a MsgFragment and send the event to `Controller` otherwise forward to Controller to send to destination
     // Panic if controller is not reacheable
     fn send_nack(&mut self, packet: &Packet, nack_type: NackType) {
+        if let PacketType::Nack(nack) = &packet.pack_type{
+            if let NackType::DestinationIsDrone = nack.nack_type{
+                return ;
+            }
+        }
         match &packet.pack_type {
             // FloodRequest can't enter in this function
             PacketType::FloodRequest(_) => {}
