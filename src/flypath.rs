@@ -185,7 +185,7 @@ impl FlyPath {
                         _ => self.send_packet(&mut packet),
                     }
                 }
-                Err(crossbeam_channel::TryRecvError::Empty) => continue,
+                Err(crossbeam_channel::TryRecvError::Empty) => break,
                 Err(crossbeam_channel::TryRecvError::Disconnected) => break,
             }
         }
@@ -323,7 +323,10 @@ impl FlyPath {
                         updated_flood_request.initiator_id,
                     )) && self.packet_send.len() > 1
                     {
-                        self.precFloodId.insert((updated_flood_request.flood_id, updated_flood_request.initiator_id));
+                        self.precFloodId.insert((
+                            updated_flood_request.flood_id,
+                            updated_flood_request.initiator_id,
+                        ));
                         let packet_to_send = Packet {
                             routing_header: packet.routing_header.clone(),
                             session_id: packet.session_id,
@@ -447,9 +450,9 @@ impl FlyPath {
     // Create and send a nack if the packet is a MsgFragment and send the event to `Controller` otherwise forward to Controller to send to destination
     // Panic if controller is not reacheable
     fn send_nack(&mut self, packet: &Packet, nack_type: NackType) {
-        if let PacketType::Nack(nack) = &packet.pack_type{
-            if let NackType::DestinationIsDrone = nack.nack_type{
-                return ;
+        if let PacketType::Nack(nack) = &packet.pack_type {
+            if let NackType::DestinationIsDrone = nack.nack_type {
+                return;
             }
         }
         match &packet.pack_type {
@@ -511,7 +514,8 @@ impl FlyPath {
 
     fn reverse_hops(&self, packet: &Packet) -> Vec<NodeId> {
         let mut reverse_hops = packet.routing_header.hops.clone();
-        reverse_hops.truncate(packet.routing_header.hop_index + 1);
+        reverse_hops.truncate(packet.routing_header.hop_index);
+        reverse_hops.insert(packet.routing_header.hop_index, self.id);
         reverse_hops.reverse();
         reverse_hops
     }
