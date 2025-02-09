@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{Nack, NackType, NodeType, Packet, PacketType};
+use wg_2024::packet::{FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
 
 #[cfg(feature = "modes")]
 use crate::messages::Messages;
@@ -339,7 +339,7 @@ impl FlyPath {
                         }
                     } else {
                         let mut response =
-                            updated_flood_request.generate_response(packet.session_id);
+                            self.generate_response(flood_request, packet.session_id);
                         self.send_packet(&mut response);
                     }
                 }
@@ -369,6 +369,30 @@ impl FlyPath {
                 }
             }
         }
+    }
+
+    fn generate_response(&self, flood_request:&mut FloodRequest, session_id: u64) -> Packet {
+        let mut source_routing = SourceRoutingHeader::initialize(
+            flood_request.path_trace
+                .iter()
+                .cloned()
+                .map(|(id, _)| id)
+                .rev()
+                .collect(),
+        );
+        if let Some(destination) = source_routing.destination() {
+            if destination != flood_request.initiator_id {
+                source_routing.hops.push(destination);
+            }
+        }
+        Packet::new_flood_response(
+            source_routing,
+            session_id,
+            FloodResponse {
+                flood_id: flood_request.flood_id,
+                path_trace: flood_request.path_trace.clone(),
+            },
+        )
     }
 
     // if is not valid packet returns the errors, possible NackType are:
