@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 use wg_2024::controller::{DroneCommand, DroneEvent};
 use wg_2024::drone::Drone;
 use wg_2024::network::{NodeId, SourceRoutingHeader};
-use wg_2024::packet::{FloodRequest, FloodResponse, Nack, NackType, NodeType, Packet, PacketType};
+use wg_2024::packet::{Nack, NackType, NodeType, Packet, PacketType};
 
 #[cfg(feature = "modes")]
 use crate::messages::Messages;
@@ -13,7 +13,7 @@ use rand::seq::SliceRandom;
 #[cfg(feature = "modes")]
 use std::fmt;
 #[cfg(feature = "modes")]
-use wg_2024::packet::{Fragment};
+use wg_2024::packet::{FloodRequest, Fragment};
 /// Enum representing the enabled fly path modes.
 #[derive(Debug, Clone)]
 pub enum FlyPathModes {
