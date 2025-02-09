@@ -338,8 +338,10 @@ impl FlyPath {
                             }
                         }
                     } else {
-                        let mut response =
-                            updated_flood_request.generate_response(packet.session_id);
+                        let mut response = updated_flood_request.generate_response(packet.session_id);
+                        if response.routing_header.hops.last() != Some (&updated_flood_request.initiator_id){
+                            response.routing_header.hops.push(updated_flood_request.initiator_id);
+                        }
                         self.send_packet(&mut response);
                     }
                 }
