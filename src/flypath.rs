@@ -308,15 +308,16 @@ impl FlyPath {
     fn packet_handler(&mut self, mut packet: Packet) {
         match &mut packet.pack_type {
             PacketType::FloodRequest(flood_request) => {
-                if let Some((last_nodeId, _)) = flood_request.path_trace.last() {
-                    #[allow(unused_mut)]
-                    let mut updated_flood_request =
+                let mut updated_flood_request =
                         flood_request.get_incremented(self.id, NodeType::Drone);
 
-                    #[cfg(feature = "modes")]
-                    if let FlyPathModes::BrainRot = self.mode {
-                        self.maybe_invalidate_floodRequest(&mut updated_flood_request);
-                    }
+                #[cfg(feature = "modes")]
+                if let FlyPathModes::BrainRot = self.mode {
+                    self.maybe_invalidate_floodRequest(&mut updated_flood_request);
+                }
+
+                if let Some((last_nodeId, _)) = flood_request.path_trace.last() {
+                    
 
                     if !self.precFloodId.contains(&(
                         updated_flood_request.flood_id,
@@ -337,14 +338,16 @@ impl FlyPath {
                                 let _ = sender.send(packet_to_send.clone());
                             }
                         }
-                    } else {
-                        let mut response = updated_flood_request.generate_response(packet.session_id);
-                        if response.routing_header.hops.last() != Some (&updated_flood_request.initiator_id){
-                            response.routing_header.hops.push(updated_flood_request.initiator_id);
-                        }
-                        self.send_packet(&mut response);
-                    }
+
+                        return;
+                    } 
+                } 
+                
+                let mut response = updated_flood_request.generate_response(packet.session_id);
+                if response.routing_header.hops.last() != Some (&updated_flood_request.initiator_id){
+                    response.routing_header.hops.push(updated_flood_request.initiator_id);
                 }
+                self.send_packet(&mut response);
             }
             _ => {
                 if packet.routing_header.current_hop().is_some() {
