@@ -419,8 +419,8 @@ mod tests {
             2,
             2,
         );
-        d2_command_send.send(DroneCommand::Crash).unwrap();
         d2_send.send(ack_from_d2_to_c1.clone()).unwrap();
+        d2_command_send.send(DroneCommand::Crash).unwrap();
 
         // wait for a response
         sleep(Duration::from_secs(1));
