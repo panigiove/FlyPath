@@ -309,43 +309,48 @@ impl FlyPath {
         match &mut packet.pack_type {
             PacketType::FloodRequest(flood_request) => {
                 let mut updated_flood_request =
-                        flood_request.get_incremented(self.id, NodeType::Drone);
+                    flood_request.get_incremented(self.id, NodeType::Drone);
 
                 #[cfg(feature = "modes")]
                 if let FlyPathModes::BrainRot = self.mode {
                     self.maybe_invalidate_floodRequest(&mut updated_flood_request);
                 }
 
-                if let Some((last_nodeId, _)) = flood_request.path_trace.last() {
-                    
-
-                    if !self.precFloodId.contains(&(
+                if !self.precFloodId.contains(&(
+                    updated_flood_request.flood_id,
+                    updated_flood_request.initiator_id,
+                )) && self.packet_send.len() > 1
+                {
+                    self.precFloodId.insert((
                         updated_flood_request.flood_id,
                         updated_flood_request.initiator_id,
-                    )) && self.packet_send.len() > 1
-                    {
-                        self.precFloodId.insert((
-                            updated_flood_request.flood_id,
-                            updated_flood_request.initiator_id,
-                        ));
-                        let packet_to_send = Packet {
-                            routing_header: packet.routing_header.clone(),
-                            session_id: packet.session_id,
-                            pack_type: PacketType::FloodRequest(updated_flood_request.clone()),
-                        };
-                        for (node_id, sender) in &self.packet_send {
-                            if node_id != last_nodeId {
-                                let _ = sender.send(packet_to_send.clone());
-                            }
-                        }
+                    ));
+                    let packet_to_send = Packet {
+                        routing_header: packet.routing_header.clone(),
+                        session_id: packet.session_id,
+                        pack_type: PacketType::FloodRequest(updated_flood_request.clone()),
+                    };
 
-                        return;
-                    } 
-                } 
-                
+                    let prev = match flood_request.path_trace.last() {
+                        Some(last_id) => last_id.0,
+                        None => updated_flood_request.initiator_id,
+                    };
+
+                    for (node_id, sender) in &self.packet_send {
+                        if *node_id != prev {
+                            let _ = sender.send(packet_to_send.clone());
+                        }
+                    }
+                    return;
+                }
+
                 let mut response = updated_flood_request.generate_response(packet.session_id);
-                if response.routing_header.hops.last() != Some (&updated_flood_request.initiator_id){
-                    response.routing_header.hops.push(updated_flood_request.initiator_id);
+                if response.routing_header.hops.last() != Some(&updated_flood_request.initiator_id)
+                {
+                    response
+                        .routing_header
+                        .hops
+                        .push(updated_flood_request.initiator_id);
                 }
                 self.send_packet(&mut response);
             }
